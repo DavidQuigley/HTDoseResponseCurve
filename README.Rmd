@@ -1,10 +1,3 @@
----
-title: "HTDoseResponseCurve"
-author: "David Quigley"
-date: "May 9, 2016"
-output: html_document
----
-
 Summary
 --------------------------------------------------------------------------------
 
