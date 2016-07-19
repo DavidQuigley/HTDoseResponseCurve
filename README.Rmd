@@ -8,17 +8,27 @@ output: html_document
 Summary
 --------------------------------------------------------------------------------
 
-The HTDoseResponseCurve library makes it straightforward to analyze and plot drug exposure experiments performed by high-throughput analysis of cells in 6, 24, 96, or 384 well plates. This library is particularly suited to experiments where one or more cell plates have been measured repeatedly over time. Although HTDoseResponseCurve can read data from any source, it can natively consume the raw files exported by the [Incucyte Cell Analysis System](http://www.essenbioscience.com/essen-products/incucyte/).
+HTDoseResponseCurve is an R library that makes it straightforward to analyze and 
+plot drug exposure experiments performed by high-throughput analysis of cells in 
+6, 24, 96, or 384 well plates. This library is particularly suited to 
+experiments where one or more cell plates have been measured repeatedly over 
+time. Although HTDoseResponseCurve can read data from any source, it can 
+natively consume the raw files exported by the [Incucyte Cell Analysis System](http://www.essenbioscience.com/essen-products/incucyte/).
 
-*HTDoseResponseCurve* fits curves using the [drc library](https://cran.r-project.org/web/packages/drc), available on CRAN.
+*HTDoseResponseCurve* fits curves using the 
+[drc library](https://cran.r-project.org/web/packages/drc), available on CRAN.
 
-This library grew out of our laboratory's need to fit dose response curves to drug screens in cell lines. These screens are typically performed on one or more 96- or 384-well plates, and may involve repeated capture of data about the cellular phenotype over time. 
+HTDoseResponseCurve grew out of our laboratory's need to fit dose response 
+curves to drug screens in cell lines. These screens are typically performed on 
+one or more 96- or 384-well plates, and may involve repeated capture of data 
+about the cellular phenotype over time. 
 
 Key Features
 --------------------------------------------------------------------------------
 
 * Fits and plots dose-response curves from high-throughput experiments
-* Reads data exported from the Incucyte platform (Essen Bioscience) in the Excel/XML format produced by that instrument. 
+* Reads data exported from the Incucyte platform (Essen Bioscience) in the 
+Excel/XML format produced by that instrument. 
 * Calculates standard descriptive values
     * SF50
     * Area Under the Curve (AUC)
@@ -30,3 +40,20 @@ Key Features
 * Calculates Interaction Index for synergy analysis
 
 HTDoseResponseCurve does not perform image analysis.
+
+Dependencies
+--------------------------------------------------------------------------------
+
+HTDoseResponseCurve requires installation of three packages available on CRAN:  
+
+* [pracma](https://cran.r-project.org/web/packages/pracma)
+* [drc](https://cran.r-project.org/web/packages/drc)
+* [readxl](https://cran.r-project.org/web/packages/readxl)
+
+The *drc* package requires 
+[multcomp](https://cran.r-project.org/web/packages/multcomp), which currently 
+requires version 2.39-4 of 
+[survival](https://cran.r-project.org/web/packages/survival). You may need to 
+obtain this version from source, as *install.packages()* installs version 
+2.39-3.
+
