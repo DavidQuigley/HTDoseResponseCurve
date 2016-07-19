@@ -13,6 +13,9 @@ plot_chou_synergy_Fa_CI(CS, ..., show_horizontal = TRUE)
 
 \item{show_horizontal}{show horizontal stripes}
 }
+\value{
+none
+}
 \description{
 plot FA vs. CI Chou synergy plot
 }

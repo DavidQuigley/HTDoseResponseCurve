@@ -860,6 +860,7 @@ plot_synergy_median_effect=function( CS, ... ){
 #'                       proportion_1=0.5,
 #'                       fct=drc::LL.2(), summary_method="mean" )
 #' plot_chou_synergy_Fa_CI(CS_lk)
+#' @return none
 #' @export
 plot_chou_synergy_Fa_CI = function( CS, ..., show_horizontal=TRUE  ){
     plot_parameters = list(...)
