@@ -1093,7 +1093,7 @@ metric_to_grid = function( x_axis_labels, y_axis_labels, values ){
 #' estimate the slope, upper asymptote, lower asymptote, and EC50, pass 
 #' drc::LL.4(). To fix the lower asymptote at 1 and estimate the other 
 #' parameters, pass drc::LL.3(). To fix the upper asympotote at 1 and the lower 
-#' asymptote at 0, pass dcr::LL.2. For a list of available functions, see 
+#' asymptote at 0, pass drc::LL.2. For a list of available functions, see 
 #' \code{drc::getMeanFunctions()}. 
 #' 
 #' To call this function you must load the drc package in your R session.
@@ -1249,7 +1249,7 @@ summary.HT_fit = function(object, ...){
 #' estimate the slope, upper asymptote, lower asymptote, and EC50, pass 
 #' drc::LL.4(). To fix the lower asymptote at 1 and estimate the other 
 #' parameters, pass drc::LL.3(). To fix the upper asympotote at 1 and the lower 
-#' asymptote at 0, pass dcr::LL.2. For a list of available functions, see 
+#' asymptote at 0, pass drc::LL.2. For a list of available functions, see 
 #' \code{drc::getMeanFunctions()}. 
 #' 
 #' @param D dataset
@@ -1412,7 +1412,7 @@ convert_to_foldchange = function(M1, M2){
 #' @param fct Non-linear function to fit, defaults to four variable LL.4 model 
 #' that estimates slope, upper asymptote, lower asymptote, and EC50. To fix 
 #' lower asymptote at 1, pass drc::LL.3(). To fix lower asympotote ant 1 and 
-#' upper asymptote at 0, pass dcr::LL.2(). For a list of available functions, 
+#' upper asymptote at 0, pass drc::LL.2(). For a list of available functions, 
 #' see drc::getMeanFunctions(). To pass a function you must load the drc 
 #' package in your R session.
 #' @param max_Pval mark comparisons where fit P_value exceeds this as NA

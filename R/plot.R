@@ -769,7 +769,7 @@ boxplot_label_outliers = function( M, ... ){
 #' CS_lk = chou_synergy( ds_lk, sample_type = "sample_1", hour=0,
 #'                       treatment_1 = "SCH66336", treatment_2="4-HPR",
 #'                       proportion_1=0.5,
-#'                       fct=LL.2(), summary_method="mean" )
+#'                       fct=drc::LL.2(), summary_method="mean" )
 #' me=plot_synergy_median_effect( CS_lk, main="Median Effect" )
 #' @export
 plot_synergy_median_effect=function( CS, ... ){   
@@ -853,7 +853,7 @@ plot_synergy_median_effect=function( CS, ... ){
 #' CS_lk = chou_synergy( ds_lk, sample_type = "sample_1", hour=0,
 #'                       treatment_1 = "SCH66336", treatment_2="4-HPR",
 #'                       proportion_1=0.5,
-#'                       fct=LL.2(), summary_method="mean" )
+#'                       fct=drc::LL.2(), summary_method="mean" )
 #' plot_chou_synergy_Fa_CI(CS_lk)
 #' @export
 plot_chou_synergy_Fa_CI = function( CS, ..., show_horizontal=TRUE  ){
