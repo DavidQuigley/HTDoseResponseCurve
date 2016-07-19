@@ -17,7 +17,7 @@ timecourse_relative_grid(D, sample_types, fct, max_Pval = 1, min_obs = Inf,
 \item{fct}{Non-linear function to fit, defaults to four variable LL.4 model 
 that estimates slope, upper asymptote, lower asymptote, and EC50. To fix 
 lower asymptote at 1, pass drc::LL.3(). To fix lower asympotote ant 1 and 
-upper asymptote at 0, pass dcr::LL.2(). For a list of available functions, 
+upper asymptote at 0, pass drc::LL.2(). For a list of available functions, 
 see drc::getMeanFunctions(). To pass a function you must load the drc 
 package in your R session.}
 

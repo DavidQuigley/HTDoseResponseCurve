@@ -38,7 +38,7 @@ library. To fit the curve, you need to select a non-linear function. To
 estimate the slope, upper asymptote, lower asymptote, and EC50, pass 
 drc::LL.4(). To fix the lower asymptote at 1 and estimate the other 
 parameters, pass drc::LL.3(). To fix the upper asympotote at 1 and the lower 
-asymptote at 0, pass dcr::LL.2. For a list of available functions, see 
+asymptote at 0, pass drc::LL.2. For a list of available functions, see 
 \code{drc::getMeanFunctions()}. 
 
 To call this function you must load the drc package in your R session.

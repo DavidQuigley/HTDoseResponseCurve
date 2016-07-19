@@ -38,7 +38,7 @@ ds_lk = create_synergy_dataset(
 CS_lk = chou_synergy( ds_lk, sample_type = "sample_1", hour=0,
                       treatment_1 = "SCH66336", treatment_2="4-HPR",
                       proportion_1=0.5,
-                      fct=LL.2(), summary_method="mean" )
+                      fct=drc::LL.2(), summary_method="mean" )
 plot_chou_synergy_Fa_CI(CS_lk)
 }
 
