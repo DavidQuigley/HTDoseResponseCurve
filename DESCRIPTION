@@ -4,7 +4,7 @@ Title: Dose Response Curve Evaluation from Incucyte and Other High-Throughput Pl
 Version: 0.99.0
 Date: 2016-04-02
 Author: David Quigley
-Maintainer: David A Quigley <David.Quigley@ucsf.edu>
+Maintainer: David A Quigley <david.a.quigley@gmail.com>
 biocViews: CellBasedAssays, TimeCourse
 Description: This package makes it straightforward to analyze time course 
     drug exposure experiments performed by high-throughput analysis of cells 
