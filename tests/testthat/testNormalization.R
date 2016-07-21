@@ -61,4 +61,19 @@ test_that("normalization works", {
     expect_equal( dim(D)[1], 30 )
     D = normalize_by_vehicle(D, summary_method = "mean")
     expect_equal( round( D$value_normalized[29],2 ), 0.05)
+    
+    
+    samples = rep("s1", 16)
+    t1 = rep( c("DMSO", "d1", "d1", "d1"), 4)
+    t2 = c( rep( "DMSO", 4), rep("d2", 12) )
+    c1 = rep( c(0, 50, 100, 200), 4)
+    c2 = c(0,0,0,0, 50,50,50,50, 100,100,100,100, 200,200,200,200)
+    value_ind=c(1,0.8,0.7,0.6,0.8,0.7,0.6,0.5,0.7,0.6,0.5,0.4,0.6,0.5,0.4,0.3)
+    value_syn=c(1,0.8,0.7,0.6,0.8,0.8,0.5,0.2,0.7,0.2,0.1,0.05,0.6,0.1,0.05,0.01)
+    
+    DS = create_synergy_dataset( sample_types=samples, treatments_1=t1, 
+                                treatments_2=t2, concentrations=c1, 
+                                concentrations_2=c2, values=value_ind, 
+                                negative_control="DMSO")
+    expect_equal( DS$value_normalized, DS$value )
 } )

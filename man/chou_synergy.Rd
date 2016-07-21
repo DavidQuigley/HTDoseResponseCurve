@@ -11,7 +11,7 @@ parameters, pass drc::LL.3(). To fix the upper asympotote at 1 and the lower
 asymptote at 0, pass dcr::LL.2. For a list of available functions, see 
 \code{drc::getMeanFunctions()}.}
 \usage{
-chou_synergy(ds, sample_type, treatment_1, treatment_2, hour, proportion_1, fct,
+chou_synergy(ds, sample_type, treatment_1, treatment_2, hour, fct,
   summary_method)
 }
 \arguments{
@@ -24,10 +24,6 @@ chou_synergy(ds, sample_type, treatment_1, treatment_2, hour, proportion_1, fct,
 \item{treatment_2}{treatment in ds}
 
 \item{hour}{hour in ds}
-
-\item{proportion_1}{value between 0 and 1, indicating the fixed proportional
-relationship between concentrations of treatment_1 and treatment_2 in the 
-combined observations. If 50/50, pass 0.5.}
 
 \item{fct}{Non-linear function to fit, e.g. drc::LL.3(). See summary.}
 

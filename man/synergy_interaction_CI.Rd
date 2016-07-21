@@ -5,8 +5,8 @@
 \title{Construct confidence intervals for observed effects at combination doses 
 having observed effects.}
 \usage{
-synergy_interaction_CI(ds, sample_type, treatment_1, treatment_2, proportion_1,
-  E, hour = 0, alpha = 0.05, summary_method = "mean")
+synergy_interaction_CI(ds, sample_type, treatment_1, treatment_2, hour = 0,
+  alpha = 0.05, summary_method = "mean")
 }
 \arguments{
 \item{ds}{dataset}
@@ -17,13 +17,6 @@ synergy_interaction_CI(ds, sample_type, treatment_1, treatment_2, proportion_1,
 
 \item{treatment_2}{treatment in ds}
 
-\item{proportion_1}{value between 0 and 1, indicating the fixed proportional
-relationship between concentrations of treatment_1 and treatment_2 in the 
-combined observations. If 50/50, pass 0.5.}
-
-\item{E}{fixed effects, their corresponding interaction indices and 
-confidence intervals are estimated.}
-
 \item{hour}{hour in ds. Default 0.}
 
 \item{alpha}{1-alpha is the size of the confidence intervals, default 0.05}
@@ -33,11 +26,10 @@ confidence intervals are estimated.}
 \value{
 A list with the interaction index, lower, and upper confidence 
 intervals for fix effects points in E
-
-list ii: estimated interaction indices corresponding to the 
-observations (c.d1, c.d2, E); ii.low, ii.up: estimated lower and upper CI
 }
 \description{
+If the dataset does not have negative controls, measurements at 
+concentration zero are assumed to be empty for a given treatment.
 Adapted directly from code published in 
 Lee and Kong Statistics in Biopharmaceutical Research 2012
 }

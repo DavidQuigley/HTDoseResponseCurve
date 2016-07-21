@@ -30,7 +30,7 @@ Excel/XML format produced by that instrument.
     * for multiple treatment concentrations at a single timepoint
     * for a single treatment concentration over multiple timepoints
 * Identifies time point at which AUC/SF50 is maximized
-* Calculates Interaction Index for synergy analysis
+* Calculates Combination Index and Bliss synergy analysis
 
 HTDoseResponseCurve does not perform image analysis.
 

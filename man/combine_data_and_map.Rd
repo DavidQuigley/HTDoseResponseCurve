@@ -40,11 +40,12 @@ dataset, if they exist. Value may be NA, a number, a string, or a data frame.
 must be one of "mean", "median". Defaults to "mean"}
 }
 \value{
-a data frame where columns indicate the sample type, treatment, 
+A data frame where columns indicate the sample type, treatment, 
 concentration, observed raw value, normalized value, name of the 
 negative_control treatment, whether a particular row 
 is a negative control for at least one other row, hours since the start time,
-and plate of origin
+and plate of origin. If the data are from a synergy experiment, there will 
+be additional columns concententration_2 and treatment_2.
 }
 \description{
 Combine a single data plate matching the output of 
@@ -54,24 +55,7 @@ one row per observation.
 }
 \details{
 The user specifies which wells (if any) bear negative controls (i.e. 
-vehicles) 
-Negative controls:
-
-If the experiment lacks negative controls, pass an empty string to the 
-negative_control parameter.
-
-If each treatment has wells with a concentration in the plate map that 
-indicates the negative control for that treatment, pass that value to the 
-negative_control parameter. The default value is 0.
-
-If more all wells share a common negative control (e.g. DMSO), pass the name 
-of the negative control treatment to the negative_control parameter.
-
-If there is more than one distinct common negative control (e.g. DMSO for 
-some treatments and ethanol for others), pass a data frame with column names 
-"drug" and "vehicle" to indicate the appropriate vehicle for each drug.
-If a data frame is passed, the drug column should contain an entry for each 
-treatment on the plate(s).
+vehicles)
 }
 \examples{
 # Create a six well plate testing two drugs on two cell lines. Each drug has 

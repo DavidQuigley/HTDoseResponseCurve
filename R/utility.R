@@ -74,6 +74,111 @@ logtics = function( log10_min, log10_max, show_x_log_tics, show_x_exponent ){
     list(values=tics, labels=labels, lwd=lwd_tics)
 }
 
+# Check header. If treatments, sample_types, concentrations are passed, 
+# confirm they are present. If hour is passed, restrict checking to that hour.
+# If dataset is not valid, raise error. If valid, return 1 if standard and 2
+# if synergy.
+is_dataset_valid = function(D, treatments=NA, sample_types=NA, 
+                            concentrations=NA, hour=NA){
+    nn = names(D)
+    header = c("sample_type", "treatment", "concentration", "value", 
+               "negative_control", "is_negative_control", "hours", "plate_id")
+    if( ! all( header %in% nn ) ){
+        stop(paste("missing element in dataset columns; must contain all of",
+                   paste( header,sep=",", collapse=",") ) )   
+    }
+    if( is.na(hour) ){
+        combined_treatments = D$treatment
+        combined_concentrations = D$concentration
+        combined_sample_types = D$sample_type
+    }else{
+        if( !hour %in% D$hours ){
+            stop(paste("hour",hour,"not present in dataset"))
+        }
+        combined_treatments = D$treatment[D$hours==hour]
+        combined_concentrations = D$concentration[D$hours==hour]
+        combined_sample_types = D$sample_type[D$hours==hour]
+    }
+    has_t2 = sum( nn=="treatment_2" ) == 1
+    has_c2 = sum( nn=="concentration_2" ) == 1
+    if( has_t2 != has_c2 ){
+        stop(paste("dataset must have either both treatment_2 and",
+                   "concentration_2 or neither") )
+    }
+    if( has_t2 ){
+        if( sum( nn=="is_negative_control_2" ) == 0 ){
+            stop("synergy datasets must have is_negative_control_2 column")   
+        }
+        if( sum( nn=="negative_control_2" ) == 0 ){
+            stop("synergy datasets must have negative_control_2 column")   
+        }
+    }
+    if( has_t2 ){
+        if( is.na(hour) ){
+            combined_treatments = c( combined_treatments, D$treatment_2 )
+        }else{
+            combined_treatments = c( combined_treatments, 
+                                     D$treatment_2[D$hours==hour] )
+        }
+    }
+    if( is.factor( combined_treatments ) ){
+        stop("treatment is a factor, should be a string")   
+    }
+    if( has_c2 ){
+        if( is.na(hour) ){
+            combined_concentrations = c( combined_concentrations, 
+                                         D$concentration_2)
+        }else{
+            combined_concentrations = c( combined_concentrations, 
+                                         D$concentration_2[D$hours==hour])
+        }
+    }
+    if( !is.na(treatments[1]) ){
+        for( i in 1:length(treatments) ){
+            if( ! treatments[i] %in% combined_treatments ){
+                if( is.na(hour) ){
+                    stop(paste("treatment",treatments[i],"not in dataset"))
+                }else{
+                    stop(paste("treatment",treatments[i],"not in dataset at",
+                               "specified hour"))
+                }
+            }
+        }
+    }
+    if( !is.na(concentrations[1]) ){
+        for( i in 1:length(concentrations) ){
+            if( ! concentrations[i] %in% combined_concentrations ){
+                if( is.na(hour) ){
+                    stop(paste("concentration", concentrations[i],
+                           "not present in dataset"))   
+                }else{
+                    stop(paste("concentration", concentrations[i],
+                               "not present in dataset at specified hour"))   
+                }
+            }
+        }
+    }
+    if( !is.na(sample_types) ){
+        for( i in 1:length(sample_types) ){
+            if( ! sample_types[i] %in% D$sample_type ){
+                if( is.na(hour) ){
+                    stop(paste("sample type",sample_types[i],"not in dataset"))
+                }else{
+                    stop(paste("sample type",sample_types[i],
+                               "not in dataset at specified hour"))
+                }
+            }
+        }
+    }
+    if( has_t2 )
+        2
+    else
+        1
+}
+
+
+
+
 # given a vector of real number V and a vector of colors color_map, scale 
 # values in V to the appropriate value in color_map. If color_bounds is not 
 # passed, bounds are set to c( min(V), max(V)). If color_NA is passed, it is 

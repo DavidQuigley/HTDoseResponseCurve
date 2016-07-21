@@ -35,6 +35,8 @@ test_that("combine works", {
     expect_equal( "Vehicle", ds_n$negative_control[1])
     expect_equal( "Vehicle", ds_n$negative_control[2])
     
+    expect_equal( is_dataset_valid(ds_n), 1 )
+    
     # data frame: missing a drug
     vd = data.frame(
         drug=c("drug_1", "drug_2"), vehicle=c("Vehicle", "Vehicle"),

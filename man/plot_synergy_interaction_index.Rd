@@ -5,8 +5,8 @@
 \title{Plot interaction index with confidence intervals for observed effects 
 at combination doses having observed effects.}
 \usage{
-plot_synergy_interaction_index(ds, sample_type, treatment_1, treatment_2,
-  proportion_1, hour, ..., log = "y", alpha = 0.05)
+plot_synergy_interaction_index(ds, sample_type, treatment_1, treatment_2, hour,
+  ..., log = "y", alpha = 0.05)
 }
 \arguments{
 \item{ds}{dataset}
@@ -16,9 +16,6 @@ plot_synergy_interaction_index(ds, sample_type, treatment_1, treatment_2,
 \item{treatment_1}{treatment in ds}
 
 \item{treatment_2}{treatment in ds}
-
-\item{proportion_1}{proportion of treatment 1 in total concentration of 
-synergy experiment}
 
 \item{hour}{hour in ds. Default 0.}
 
@@ -46,7 +43,8 @@ syn = data.frame( treatment_1 = rep("SCH66336", 13),
                   conc_1 = c( dose_SCH, rep(0, 4), dose_SCH[1:4]),
                   treatment_2 = rep("4-HPR", 13),
                   conc_2 = c( rep(0, 5), dose_4HPR, dose_4HPR ),
-                  values = c(eff_SCH, eff_4HPR, eff_comb ) )
+                  values = c(eff_SCH, eff_4HPR, eff_comb ), 
+                  stringsAsFactors=FALSE )
 ds_lk = create_synergy_dataset( sample_types = rep("sample_1", 13), 
                                 treatments_1 = syn$treatment_1,
                                 treatments_2 = syn$treatment_2,
@@ -55,7 +53,7 @@ ds_lk = create_synergy_dataset( sample_types = rep("sample_1", 13),
                                 values = syn$values)
 ii=plot_synergy_interaction_index(ds=ds_lk, sample_type = "sample_1", 
                               treatment_1 = "SCH66336", treatment_2="4-HPR", 
-                              proportion_1=0.5, hour=0, 
+                              hour=0, 
                               xlab="Effect", ylab="Interaction Index" ,
                               main="Interaction Index")
 }

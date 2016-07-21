@@ -1,4 +1,4 @@
-#' Convert a matrix to colors and plot as a grid of those colors
+#' Plot a grid of colors given a matrix of numbers
 #' 
 #' @param M matrix of values to plot
 #' @param block.height element height, default 20
@@ -288,8 +288,6 @@ set_list_default = function(L, name, val){
 #' @param sample_type sample type in ds
 #' @param treatment_1 treatment in ds
 #' @param treatment_2 treatment in ds
-#' @param proportion_1 proportion of treatment 1 in total concentration of 
-#' synergy experiment
 #' @param hour hour in ds. Default 0. 
 #' @param log which scale should be logged; default is "y"
 #' @param ... additional parameters to pass to plot function
@@ -307,7 +305,8 @@ set_list_default = function(L, name, val){
 #'                   conc_1 = c( dose_SCH, rep(0, 4), dose_SCH[1:4]),
 #'                   treatment_2 = rep("4-HPR", 13),
 #'                   conc_2 = c( rep(0, 5), dose_4HPR, dose_4HPR ),
-#'                   values = c(eff_SCH, eff_4HPR, eff_comb ) )
+#'                   values = c(eff_SCH, eff_4HPR, eff_comb ), 
+#'                   stringsAsFactors=FALSE )
 #' ds_lk = create_synergy_dataset( sample_types = rep("sample_1", 13), 
 #'                                 treatments_1 = syn$treatment_1,
 #'                                 treatments_2 = syn$treatment_2,
@@ -316,25 +315,17 @@ set_list_default = function(L, name, val){
 #'                                 values = syn$values)
 #' ii=plot_synergy_interaction_index(ds=ds_lk, sample_type = "sample_1", 
 #'                               treatment_1 = "SCH66336", treatment_2="4-HPR", 
-#'                               proportion_1=0.5, hour=0, 
+#'                               hour=0, 
 #'                               xlab="Effect", ylab="Interaction Index" ,
 #'                               main="Interaction Index")
 #' @export
 plot_synergy_interaction_index = function(ds, sample_type, 
                                           treatment_1, treatment_2, 
-                                          proportion_1,
                                           hour, ..., log="y", alpha=0.05){
     
     # effects seen with combined treatment
-    if( sum( ds$sample_type==sample_type )==0 ){
-        stop( "passed value for sample_type parameter not found in D")
-    }
-    if( sum( ds$treatment==treatment_1 )==0 ){
-        stop( "passed value for treatment_1 parameter not found in D")
-    }
-    if( sum( ds$treatment_2==treatment_2 )==0 ){
-        stop( "passed value for treatment_2 parameter not found in D")
-    }
+    ds_type = is_dataset_valid(ds, treatments=c(treatment_1, treatment_2), 
+                                hour=hour )
     pp = list(...)
     pp = set_list_default(pp, "xlim", c(0,1))
     pp = set_list_default(pp, "ylim", c(0.01, 10))
@@ -345,34 +336,14 @@ plot_synergy_interaction_index = function(ds, sample_type,
     pp = set_list_default(pp, "log", log)
     pp = set_list_default(pp, "pch", 19)
     
-    idx = ds$treatment==treatment_1 & ds$treatment_2==treatment_2 & 
-        ds$concentration != 0 & ds$concentration_2 != 0 & 
-        !ds$is_negative_control &
-        ds$hours==hour & ds$sample_type==sample_type
-    E_ci = seq(from=0.01, to=1, by=0.01)
-    ds_c = ds[idx,]
-    ds_c$conc_final =  ds_c$concentration + ds_c$concentration_2
-    E_combined = plyr::ddply( ds_c, c("conc_final"), 
-                              function(po){ data.frame( 
-                                  mu=mean(po$value_normalized, na.rm=TRUE)) 
-                              } )$mu
-    if( sum(E_combined>1)>0 ){
-        warning("One or more effects were greater than 1, setting to 0.999")   
-    }
-    E_combined[ E_combined >= 1 ] = 0.999
-    obs_plus_ci = data.frame( is_obs = c( rep( TRUE, length(E_combined)), 
-                                          rep( FALSE, length(E_ci)) ),
-                              effect = c(E_combined, E_ci ) )
-    obs_plus_ci=obs_plus_ci[order(obs_plus_ci$effect),]
     CI.d=synergy_interaction_CI(ds, sample_type=sample_type, 
                                 treatment_1=treatment_1, 
                                 treatment_2=treatment_2,
-                                E=obs_plus_ci$effect, proportion_1=proportion_1,
                                 hour=hour, alpha=alpha)
     y=CI.d$interaction_index
-    x=obs_plus_ci$effect
-    pp[["x"]] =  x[ obs_plus_ci$is_obs ]
-    pp[["y"]] = y[ obs_plus_ci$is_obs ]
+    x=CI.d$effects
+    pp[["x"]] =  x[ CI.d$is_obs ]
+    pp[["y"]] = y[ CI.d$is_obs ]
     do.call( graphics::plot, pp)
     graphics::lines( x, CI.d$cl_lower, lty=2, col="cornflowerblue" )
     graphics::lines( x, CI.d$cl_upper, lty=2, col="cornflowerblue" )
@@ -763,9 +734,9 @@ boxplot_label_outliers = function( M, ... ){
 #'     conc_1 = c( dose_SCH, rep(0, 4), dose_SCH[1:4]),
 #'     treatment_2 = rep("4-HPR", 13),
 #'     conc_2 = c( rep(0, 5), dose_4HPR, dose_4HPR ),
-#'     values = c(eff_SCH, eff_4HPR, eff_comb ) )
-#' ds_lk = create_synergy_dataset(
-#'                                 sample_types = rep("sample_1", 13), 
+#'     values = c(eff_SCH, eff_4HPR, eff_comb ),
+#'     stringsAsFactors=FALSE )
+#' ds_lk = create_synergy_dataset( sample_types = rep("sample_1", 13), 
 #'                                 treatments_1 = syn$treatment_1,
 #'                                 treatments_2 = syn$treatment_2,
 #'                                 concentrations_1 = syn$conc_1,
@@ -773,7 +744,6 @@ boxplot_label_outliers = function( M, ... ){
 #'                                 values = syn$values)
 #' CS_lk = chou_synergy( ds_lk, sample_type = "sample_1", hour=0,
 #'                       treatment_1 = "SCH66336", treatment_2="4-HPR",
-#'                       proportion_1=0.5,
 #'                       fct=drc::LL.2(), summary_method="mean" )
 #' me=plot_synergy_median_effect( CS_lk, main="Median Effect" )
 #' @export
@@ -842,14 +812,13 @@ plot_synergy_median_effect=function( CS, ... ){
 #' dose_4HPR = c(0.1, 0.5, 1, 2)
 #' eff_4HPR = c(0.7666, 0.5833, 0.5706, 0.4934)
 #' eff_comb = c(0.6539, 0.4919, 0.3551, 0.2341)
-#' syn = data.frame( 
-#'     treatment_1 = rep("SCH66336", 13),
-#'     conc_1 = c( dose_SCH, rep(0, 4), dose_SCH[1:4]),
-#'     treatment_2 = rep("4-HPR", 13),
-#'     conc_2 = c( rep(0, 5), dose_4HPR, dose_4HPR ),
-#'     values = c(eff_SCH, eff_4HPR, eff_comb ) )
-#' ds_lk = create_synergy_dataset(
-#'                                 sample_types = rep("sample_1", 13), 
+#' syn = data.frame( treatment_1 = rep("SCH66336", 13),
+#'                   conc_1 = c( dose_SCH, rep(0, 4), dose_SCH[1:4]),
+#'                   treatment_2 = rep("4-HPR", 13),
+#'                   conc_2 = c( rep(0, 5), dose_4HPR, dose_4HPR ),
+#'                   values = c(eff_SCH, eff_4HPR, eff_comb ),
+#'                   stringsAsFactors=FALSE )
+#' ds_lk = create_synergy_dataset( sample_types = rep("sample_1", 13), 
 #'                                 treatments_1 = syn$treatment_1,
 #'                                 treatments_2 = syn$treatment_2,
 #'                                 concentrations_1 = syn$conc_1,
@@ -857,7 +826,6 @@ plot_synergy_median_effect=function( CS, ... ){
 #'                                 values = syn$values)
 #' CS_lk = chou_synergy( ds_lk, sample_type = "sample_1", hour=0,
 #'                       treatment_1 = "SCH66336", treatment_2="4-HPR",
-#'                       proportion_1=0.5,
 #'                       fct=drc::LL.2(), summary_method="mean" )
 #' plot_chou_synergy_Fa_CI(CS_lk)
 #' @return none

@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot.R
 \name{plot_color_grid}
 \alias{plot_color_grid}
-\title{Convert a matrix to colors and plot as a grid of those colors}
+\title{Plot a grid of colors given a matrix of numbers}
 \usage{
 plot_color_grid(M, block.height = 20, block.width = 10, space.X = 3,
   space.Y = 10, cex.x = 1, cex.y = 1, border = TRUE,
@@ -38,7 +38,7 @@ palatte, defaults to c( min(M), max(M) )}
 M, including possible truncation from color bounds
 }
 \description{
-Convert a matrix to colors and plot as a grid of those colors
+Plot a grid of colors given a matrix of numbers
 }
 \examples{
 M = matrix(1:12, nrow=3, ncol=4,byrow=TRUE)
