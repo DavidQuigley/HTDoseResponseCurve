@@ -13,6 +13,9 @@
 #' @param color_bounds two element vector with lower and upper limit for color 
 #' palatte, defaults to c( min(M), max(M) )
 #' @param num_colors number of color gradations in palatte, default 50
+#' @param main Plot main title, default blank.
+#' @param xlab Plot x axis label, default blank.
+#' @param ylab Plot y axis label, default blank.
 #' @return M, including possible truncation from color bounds
 #' @examples 
 #' M = matrix(1:12, nrow=3, ncol=4,byrow=TRUE)
@@ -26,7 +29,8 @@
 plot_color_grid = function(M, block.height=20, block.width=10, space.X=3, 
                          space.Y=10, cex.x=1, cex.y=1, border=TRUE, 
                          color_palatte=c("blue","white","red"), 
-                         color_bounds=NA, num_colors=50 ) {
+                         color_bounds=NA, num_colors=50, 
+                         main="", xlab="", ylab="" ) {
     
     cmap = grDevices::colorRampPalette( colors=color_palatte )( num_colors )
     if( is.na(color_bounds)[1] ){
@@ -46,9 +50,9 @@ plot_color_grid = function(M, block.height=20, block.width=10, space.X=3,
     n.cols = dim(MC)[2]
     total.width =  ( block.width*n.cols) + ( (n.cols-1) * space.X)
     total.height = ( block.height * n.rows ) + ( (n.rows-1) * space.Y)
-    graphics::plot(0,0,col="white", xlim=c(0,total.width), 
-                   ylim=c(0,total.height), axes=FALSE, xlab="", ylab="", 
-                   bg="azure2")
+    graphics::plot(0, 0, col="white", xlim=c(0,total.width), 
+                   ylim=c(0,total.height), axes=FALSE, xlab=xlab, ylab=ylab, 
+                   bg="azure2", main=main)
     xlab_locs = rep(0, n.cols)
     ylab_locs = rep(0, n.rows)
     cur.y = total.height
@@ -68,7 +72,7 @@ plot_color_grid = function(M, block.height=20, block.width=10, space.X=3,
         cur.y = cur.y - block.height - space.Y
     }
     graphics::axis(1, at=xlab_locs, labels=dimnames(MC)[[2]], las=2, 
-                   cex.axis=cex.x, tick=FALSE, padj=1, line=-1.5 )
+                   cex.axis=cex.x, tick=FALSE, padj=1, line=-1 )
     graphics::axis(2, at=ylab_locs, labels=dimnames(MC)[[1]], las=2, 
                    cex.axis=cex.y, tick=FALSE, hadj=1, line=-1.5)
     M
