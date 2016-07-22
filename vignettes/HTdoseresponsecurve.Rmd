@@ -940,3 +940,53 @@ legend( 0, 3, c("interaction", "95% C.I."), lty=c(1, 2),
         col=c("black", "cornflowerblue"), cex=0.75)
 ```
 
+
+Bliss Synergy
+=====================
+
+Bliss synergy is calculated using a different null model, one that is based 
+on probabilistic independence. Bliss synergy is reported as deviation 
+(difference) of the observed values for drug combinations from the values 
+predicted by Bliss independence, which takes the form:
+
+$\textit{Effect}_{null} = \textit{Effect_A} + \textit{Effect_B} - 
+(\textit{Effect_A} \times \textit{Effect_B})$
+
+This result is sometimes called the "excess over Bliss independence".
+
+In this example, two drugs are tested at four concentrations (including 0 nM, 
+the vehicle condition). Heat maps plotted using the *plot_color_grid()* function 
+show the excess over Bliss independence.
+
+```{r fig.height=5, fig.width=9}
+samples = rep("s1", 16)
+t1 = rep( c("DMSO", "d1", "d1", "d1"), 4)
+t2 = c( rep( "DMSO", 4), rep("d2", 12) )
+c1 = rep( c(0, 50, 100, 200), 4)
+c2 = c(0,0,0,0, 50,50,50,50, 100,100,100,100, 200,200,200,200)
+value_ind=c(1,0.8,0.7,0.6,0.8,0.7,0.6,0.5,0.7,0.6,0.5,0.4,0.6,0.5,0.4,0.3)
+value_syn=c(1,0.8,0.7,0.6,0.8,0.8,0.5,0.3,0.7,0.3,0.2,0.1,0.6,0.3,0.1,0.05)
+
+DS_i=create_synergy_dataset( sample_types=samples, treatments_1=t1,
+                         treatments_2=t2, concentrations=c1, 
+                         concentrations_2=c2, values=value_ind, 
+                         negative_control="DMSO")
+DS_s=create_synergy_dataset( sample_types=samples, treatments_1=t1,
+                         treatments_2=t2, concentrations=c1, 
+                         concentrations_2=c2, values=value_syn, 
+                         negative_control="DMSO")
+
+b_ind = synergy_bliss(DS_i, "d1", "d2")
+b_syn = synergy_bliss(DS_s, "d1", "d2")
+layout(matrix(1:2,1,2))
+gi = plot_color_grid(b_ind$excess, color_bounds = c(-1,1), 
+                main="additive", xlab="nM drug 1", ylab="nM drug 2")
+gs = plot_color_grid(b_syn$excess, color_bounds = c(-1,1), 
+                main="synergistic", xlab="nM drug 1", ylab="nM drug 2")
+```
+
+We can look at the raw values directly:
+
+```{r}
+b_syn
+```
