@@ -7,7 +7,7 @@
 plot_color_grid(M, block.height = 20, block.width = 10, space.X = 3,
   space.Y = 10, cex.x = 1, cex.y = 1, border = TRUE,
   color_palatte = c("blue", "white", "red"), color_bounds = NA,
-  num_colors = 50)
+  num_colors = 50, main = "", xlab = "", ylab = "")
 }
 \arguments{
 \item{M}{matrix of values to plot}
@@ -33,6 +33,12 @@ c("blue", "white", "red")}
 palatte, defaults to c( min(M), max(M) )}
 
 \item{num_colors}{number of color gradations in palatte, default 50}
+
+\item{main}{Plot main title, default blank.}
+
+\item{xlab}{Plot x axis label, default blank.}
+
+\item{ylab}{Plot y axis label, default blank.}
 }
 \value{
 M, including possible truncation from color bounds
