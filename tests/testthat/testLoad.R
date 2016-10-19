@@ -21,8 +21,8 @@ test_that("loading works", {
     fn_map= system.file("extdata", "sample_data_96_platemap.xlsx",package=pkg)
     plate_map=read_platemap_from_excel( fn_map, number_of_wells=96)
         
-    expect_equal( length(sort( unique( matrix( t(plate_map$treatment) ) ) )), 5)
-    expect_equal( sum(plate_map$treatment=="Vehicle"), 11 )
+    expect_equal( length(sort( unique( matrix( t(plate_map$treatment) ) ) )), 4)
+    expect_equal( sum(plate_map$treatment=="Vehicle", na.rm = TRUE), 11 )
     expect_equal( plate_map$treatment[1,3], "drug_1")
     
     fn_data = system.file("extdata", "sample_data_synergy_platemap.xml", 
