@@ -22,6 +22,9 @@
 read_platemap_from_Incucyte_XML = function( path_to_file, 
                                             attribute_value="description",
                                             max_treatments_per_well = 1){
+    if( !file.exists(path_to_file) ){
+        stop(paste("Cannot open a file at",path_to_file))   
+    }
     if( !is.numeric(max_treatments_per_well)){
         stop("parameter max_treatments_per_well must be either 1 or 2")   
     }
@@ -101,6 +104,8 @@ read_platemap_from_Incucyte_XML = function( path_to_file,
 #' treatment_identifier map will follow. Defaults to "treatment".
 #' @param sample_identifier text in a cell in column 1 that signals the 
 #' sample_identifier map will follow. Defaults to "cell line".
+#' @param na.strings text in a cell that is interpreted as missing data. 
+#' Defaults to the strings "NA" or an empty cell.
 #' @return A data frame where columns are data, timestamp, plate_id, hour.
 #' @import readxl
 #' @examples
@@ -111,7 +116,8 @@ read_platemap_from_Incucyte_XML = function( path_to_file,
 read_platemap_from_excel = function( filename, sheet_num=1, number_of_wells,
                                      concentration_identifier="concentration",
                                      treatment_identifier="treatment",
-                                     sample_identifier="cell line"){
+                                     sample_identifier="cell line",
+                                     na.strings=c("", "NA") ){
     
     xl = readxl::read_excel(filename, sheet=sheet_num, col_names = FALSE)
     ROWS = plate_dimensions_from_wells(number_of_wells)$rows
@@ -164,8 +170,11 @@ read_platemap_from_excel = function( filename, sheet_num=1, number_of_wells,
     map_conc = data.frame(  xl[(idx_conc+1) : (idx_conc+ROWS),   2:(COLS+1)] )
     map_treat = data.frame( xl[(idx_treat+1) : (idx_treat+ROWS), 2:(COLS+1)] )
     map_line = data.frame(  xl[(idx_line+1) : (idx_line+ROWS),   2:(COLS+1)] )
-    map_line[is.na(map_line)] = ""
-    map_treat[is.na(map_treat)] = ""
+    for( i in length(na.strings)){
+        map_conc[ map_conc==na.strings[i] ] = NA   
+        map_line[ map_line==na.strings[i] ] = NA
+        map_treat[ map_treat==na.strings[i] ] = NA
+    }
     names(map_conc) = 1:COLS
     names(map_treat) = 1:COLS
     names(map_line) = 1:COLS
