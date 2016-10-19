@@ -42,18 +42,23 @@ HT_fit = function(...){
 # for each unique sample_type + treatment, find the appropriate vehicle
 #
 subset_treatments = function( D, sample_types, treatments, hours, 
-                              concentration_column, treatment_columm ){
+                              concentration_columns, treatment_columns ){
     idx = c()
     conditions_to_fit = c()
-    working_treatment = D$treatment
-    if( treatment_columm == "treatment_2")
-        working_treatment = D$treatment_2
+    concentrations = c()
+    
     for(i in 1:length(sample_types)){
         for(j in 1:length(treatments)){
-            #index of this {treatment, sample, hour} 
-            idx_D =  which(working_treatment==treatments[j] & 
-                           D$sample_type==sample_types[i] & 
+            #idx_D index of this {treatment, sample, hour} 
+            if( treatment_columns[j]=="treatment" ){
+                idx_D =  which(D$treatment == treatments[j] & 
+                           D$sample_type == sample_types[i] & 
                            D$hours %in% hours )
+            }else{
+                idx_D =  which(D$treatment_2 == treatments[j] & 
+                           D$sample_type == sample_types[i] & 
+                           D$hours %in% hours )                
+            }
             if( length(idx_D)==0 ){
                 stop( paste("Requested combination of treatment=",
                              treatments[j], "sample_type =", sample_types[j], 
@@ -61,25 +66,37 @@ subset_treatments = function( D, sample_types, treatments, hours,
             }
             cur_plate_ids = unique( D$plate_id[idx_D] )
             vehicle_names = unique( D$negative_control[ idx_D ] )
-            idx_V = which(working_treatment %in% vehicle_names & 
+            if( treatment_columns[j]=="treatment" ){
+                idx_V = which(D$treatment %in% vehicle_names & 
                           D$sample_type == sample_types[i] & 
                           D$hours %in% hours & 
                           D$plate_id %in% cur_plate_ids &
                           D$is_negative_control )
+            }else{
+                idx_V = which(D$treatment_2 %in% vehicle_names & 
+                          D$sample_type == sample_types[i] & 
+                          D$hours %in% hours & 
+                          D$plate_id %in% cur_plate_ids &
+                          D$is_negative_control_2 )
+            }
             idx = c(idx, idx_D, idx_V)
             new_condition =rep( paste(sample_types[i], treatments[j],sep="_|_"), 
                                  length(idx_D)+length(idx_V))
             conditions_to_fit = c(conditions_to_fit, new_condition)
+            if( concentration_columns[j]=="concentration" ){
+                concentrations = c( concentrations, D$concentration[idx_D], 
+                                    D$concentration[idx_V] )
+            }else{
+                concentrations = c( concentrations, D$concentration_2[idx_D],
+                                    D$concentration_2[idx_V] )
+            }
         }
     }
-    res=data.frame(  value =             D$value_normalized[ idx ], 
-                     concentration =     D$concentration[idx], 
-                     sample_type =       D$sample_type[idx], 
-                     conditions_to_fit = conditions_to_fit, 
+    res=data.frame( value =             D$value_normalized[ idx ], 
+                    concentration =     concentrations,
+                    sample_type =       D$sample_type[idx], 
+                    conditions_to_fit = conditions_to_fit, 
                     stringsAsFactors=FALSE )
-    if( concentration_column=="concentration_2"){
-        res$concentration = as.numeric(D$concentration_2[idx])
-    }
     res
 }
 
@@ -495,13 +512,23 @@ prepare_for_normalization = function( D, negative_control ){
             stop(paste("negative_control", negative_control,
                        "is not among the treatments on this plate"))
         }
-        neg_ctl = rep( negative_control, dim(D)[1])
-        is_neg_ctl = D$treatment==negative_control
-        if( is_synergy ){
-            neg_ctl_2 = rep( negative_control, dim(D)[1])
-            is_neg_ctl_2 = D$treatment_2==negative_control
-        }
         
+        if( is_synergy ){
+            neg_ctl = rep( negative_control, dim(D)[1])
+            neg_ctl_2 = rep( negative_control, dim(D)[1])
+            is_neg_ctl = !is.na(D$treatment) & !is.na(D$treatment_2) & 
+                         D$treatment==negative_control & 
+                         D$treatment_2==negative_control
+            is_neg_ctl_2 = is_neg_ctl
+        }else{
+            neg_ctl = rep( negative_control, dim(D)[1])
+            is_neg_ctl = !is.na(D$treatment) & D$treatment==negative_control
+        }
+        if( sum(is_neg_ctl)==0 ) {
+            warning(paste("negative control",negative_control,"was specified", 
+                          "but no wells were marked as untreated when",
+                          "including both treatment and treatment_2 columns"))   
+        }
     }else if( is.data.frame( negative_control ) ){
         VD = negative_control
         if( sum(names(VD)=="drug" ) == 0 | 
@@ -970,8 +997,8 @@ combine_data_and_map = function( raw_plate,
     if( length( which(names(plate_map)=="treatment_2") )==1 ){
         if( length( which(names(plate_map)=="concentration_2") ) != 1 ){
             stop(paste("inferring that this is a synergy plate map from",
-                       "presence of concentration_2; the plate_map list is missing a",
-                       "matrix called concentration_2"))
+                       "presence of concentration_2; the plate_map list is",
+                       "missing a matrix called concentration_2"))
         }
     }
     N_obs = sum( !is.na( raw_plate[, 1:N_data_cols] ) )
@@ -1013,10 +1040,14 @@ combine_data_and_map = function( raw_plate,
             }
         }
     }
-    concentration = as.numeric( concentration )
+    keep = !is.na( concentration ) & !is.na( treatment ) & !is.na( sample_type )
+    value[ !keep ] = NA
+    concentration[ keep ] = as.numeric( concentration[ keep ] )
 
     if( is_synergy ){
-        concentration_2 = as.numeric( concentration_2 )
+        keep = keep & !is.na( concentration_2 ) & !is.na( treatment_2 )
+        value[ !keep ] = NA
+        concentration_2[ keep ] = as.numeric( concentration_2[ keep ] )
         D = data.frame( sample_type, treatment, concentration, 
               treatment_2, concentration_2, 
               value = as.numeric(value), value_normalized = as.numeric( value ),
@@ -1117,14 +1148,19 @@ metric_to_grid = function( x_axis_labels, y_axis_labels, values ){
 #' be fit. If NA, fit all treatments. Default is NA.
 #' @param hour The hour in experiment dataset D at which to fit. If NA, combine
 #' all timepoints.
-#' @param concentration_column The name of the column in D to use for the 
-#' concentration values in the curve. For non-synergy experiments, use the 
-#' default "concentration". For synergy experiments, specify either of
-#' {concentration, concentration_2}.
-#' @param treatment_column The name of the column in D to use for the 
-#' treatment values in the curve. For non-synergy experiments, use the 
-#' default "treatment". For synergy experiments, specify either of
-#' {treatment, treatment_2}.
+#' @param concentration_columns The name of the columns in D to use for the 
+#' concentration values in the curve. Defaults to NA, which will use the 
+#' "concentration" column for all treatments. This is the correct choice for 
+#' non-synergy experiments. For synergy experiments, where concentration may 
+#' be in either column "concentration" or "concentration_2", pass a vector with 
+#' a value for each treatment that is either "concentration" or 
+#' "concentration_2".
+#' @param treatment_columns The name of the columns in D to use for the 
+#' treatment values in the curve. Defaults to NA, which will use the "treatment" 
+#' column for all treatments. This is the correct choice for non-synergy 
+#' experiments. For synergy experiments, where treatments may be in either 
+#' column "treatment" or "treatment_2", pass a vector with value for each 
+#' treatment that is either "treatment" or "treatment_2".
 #' @examples 
 #' sample_types = rep( c(rep("line1",3), rep("line2",3)), 5)
 #' treatments = c(rep("DMSO",6), rep("drug",24))
@@ -1149,8 +1185,7 @@ metric_to_grid = function( x_axis_labels, y_axis_labels, values ){
 #' @importFrom stats anova
 #' @export
 fit_DRC = function(D, fct, sample_types=NA, treatments=NA, hour=NA,
-                   concentration_column="concentration", 
-                   treatment_column="treatment"){
+                   concentration_columns=NA, treatment_columns=NA){
     
     ds_type = is_dataset_valid(D, sample_types=sample_types, 
                                treatments = treatments, hour=hour)
@@ -1158,33 +1193,55 @@ fit_DRC = function(D, fct, sample_types=NA, treatments=NA, hour=NA,
         sample_types = sort(unique(D$sample_type))    
     }
     
-    if( sum(names(D)==treatment_column) != 1 ){
-        stop(paste("value", treatment_column, "passed for parameter",
-                   "treatment_column is not present in D"))
-    }
-    if( sum(names(D)==concentration_column) != 1 ){
-        stop(paste("value",concentration_column, "passed for parameter",
-                   "concentration_column is not present in D"))
+    # set treatments to all values if user passed NA
+    if( is.na(treatments[1]) ){
+        treatments = sort(unique(D$treatment))
     }
     
-    if( is.na(treatments[1]) ){
-        if( treatment_column=="treatment_2" ){
-            treatments = sort(unique(D$treatment_2))    
-        }else{
-            treatments = sort(unique(D$treatment))    
+    # set treatment_columns to treatment if user passed NA
+    if( is.na( treatment_columns ) ){
+        treatment_columns = rep("treatment", length(treatments) )
+    }else{
+        if( length(treatment_columns) != length(treatments) ){
+            stop(paste("parameter treatment_columns must be either NA or",
+                     "be a vector of the same length as parameter treatments"))
+        }
+        for( i in 1:length(treatment_columns) ){
+            if( treatment_columns[i] != "treatment" & 
+                treatment_columns[i] != "treatment_2")
+                stop(paste("Values for parameter treatment_columns must be", 
+                           "one of {treatment, treatment_2}") )
         }
     }
+    
+    # check treatments; treatment_columns will have same length by now
     for(i in 1:length(treatments)){
-        if( treatment_column=="treatment_2" ){
+        if( treatment_columns[i]=="treatment_2" ){
             if( sum(D$treatment_2==treatments[i])==0 ) 
-              stop(paste("treatments parameter", treatments[i],
-                         "not present in D"))
+                stop(paste("value in treatments parameter", treatments[i],
+                           "not present in D in column treatments_2"))
         }else{
             if( sum(D$treatment==treatments[i])==0 ) 
-                stop(paste("treatments parameter", treatments[i],
-                           "not present in D"))   
+                stop(paste("value in treatments parameter", treatments[i],
+                           "not present in D in column treatments"))   
         }
     }
+    
+    if( is.na( concentration_columns ) ){
+        concentration_columns = rep("concentration", length(treatments) )
+    }else{
+        if( length(concentration_columns) != length(treatments) ){
+            stop(paste("parameter concentration_columns must be either NA or",
+                      "be a vector of the same length as parameter treatments"))
+        }
+        for( i in 1:length(concentration_columns) ){
+            if( concentration_columns[i] != "concentration" & 
+                concentration_columns[i] != "concentration_2")
+                stop(paste("Values for parameter concentration_columns must be",
+                            "one of {concentration,concentration_2}") )
+        }
+    }
+    
     if( is.na(hour[1]) ){
         hour = unique(D$hours)
     }
@@ -1195,7 +1252,7 @@ fit_DRC = function(D, fct, sample_types=NA, treatments=NA, hour=NA,
 
     FIT = HT_fit()
     FIT$input = subset_treatments( D, sample_types, treatments, hour, 
-                                   concentration_column, treatment_column )
+                                   concentration_columns, treatment_columns )
     FIT$unique_conditions = sort( unique( FIT$input$conditions_to_fit ) ) 
     FIT$sample_types = sample_types
     FIT$treatments = treatments
