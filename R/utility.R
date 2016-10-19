@@ -158,7 +158,7 @@ is_dataset_valid = function(D, treatments=NA, sample_types=NA,
             }
         }
     }
-    if( !is.na(sample_types) ){
+    if( !is.na(sample_types)[1] ){
         for( i in 1:length(sample_types) ){
             if( ! sample_types[i] %in% D$sample_type ){
                 if( is.na(hour) ){
