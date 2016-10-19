@@ -428,6 +428,8 @@ plot_values_by_plate = function( plate, hour=NA, color_bounds=c(0,100),
 #' @param sample_types which sample types to draw
 #' @param treatments which treatments to draw
 #' @param concentrations which concentrations to draw
+#' @param plot_raw plot un-normalized raw values, defaults TRUE. If FALSE, 
+#' plots value_normalized.
 #' @param ... standard parameters for \code{plot} function
 #' @param cex.yaxis size coefficient for Y axis, default 2
 #' @param axis.font font value for axis, default 2 (bold)
@@ -444,11 +446,12 @@ plot_values_by_plate = function( plate, hour=NA, color_bounds=c(0,100),
 #' plate_data$hours = round(plate_data$hours)
 #' ds = combine_data_and_map( plate_data, plate_map, negative_control = "DMSO" )
 #' ds = ds[ds$treatment=="drug13" | ds$treatment=="DMSO",]
-#' plot_timecourse_raw( ds, sample_types=c("line_1", "line_2"), 
+#' plot_timecourse( ds, sample_types=c("line_1", "line_2"), 
 #'                      treatments="DMSO", concentrations=0)
 #' @export
-plot_timecourse_raw = function( D, sample_types, treatments, 
-                                concentrations, ..., cex.yaxis=2, axis.font=2,
+plot_timecourse = function( D, sample_types, treatments, 
+                                concentrations, plot_raw=TRUE, 
+                                ..., cex.yaxis=2, axis.font=2,
                                 summary_method="mean"){
     if( summary_method != "mean" & summary_method != "median"){
         stop("summary_method parameter must be either mean or median")
@@ -487,29 +490,42 @@ plot_timecourse_raw = function( D, sample_types, treatments,
     
     line2pch = hsh_from_vectors( as.character(unique_lines) , 
                                  INC_pches[1:length(unique_lines)] )
-    Mstat = plyr::ddply( ds_cur, c("sample_type", "hours", "concentration"), 
+        Mstat = plyr::ddply( ds_cur, c("sample_type", "hours", "concentration"), 
                          function(x){ 
         data.frame(
-            mu=mean(x$value, na.rm=TRUE),med=stats::median(x$value, na.rm=TRUE), 
+            mu_raw = mean(x$value, na.rm=TRUE),
+            med_raw = stats::median(x$value, na.rm=TRUE), 
+            mu_norm = mean(x$value_normalized, na.rm=TRUE),
+            med_norm = stats::median(x$value_normalized, na.rm=TRUE), 
             color=hsh_get( conc2color, as.character(x$concentration) ), 
             pch = hsh_get( line2pch, x$sample_type),
             sample_type=x$sample_type,
             concentration=x$concentration, stringsAsFactors=FALSE)}
-    )
-    if( summary_method=="mean"){
-        values = Mstat$mu
-    }else{
-        values = Mstat$med
+        )
+    
+    if( summary_method=="mean" & plot_raw ){
+        values = Mstat$mu_raw
+    }
+    else if( summary_method=="mean" & !plot_raw ){
+        values = Mstat$mu_norm
+    }
+    else if( summary_method=="median" & !plot_raw ){
+        values = Mstat$med_raw
+    }
+    else if( summary_method=="medan" & !plot_raw ){
+        values = Mstat$med_norm
     }
     plot_parameters = list(...)
     plot_parameters[["xlim"]] = c(0, max(hours))
     plot_parameters[["axes"]] = FALSE
     plot_parameters[["pch"]] = Mstat$pch
-    plot_parameters[["col"]] = Mstat$color
+    if( length( which( names(plot_parameters)=="col") ) == 0 ){
+        plot_parameters[["col"]] = Mstat$color
+    }
     plot_parameters[["x"]] = Mstat$hours
     plot_parameters[["y"]] = values
     if( length( which( names(plot_parameters)== "ylim"  ) )==0 ){
-        plot_parameters[["ylim"]] = c(0, 100)
+        plot_parameters[["ylim"]] = c(0, max(values, na.rm=TRUE) )
     }
     if( length( which( names(plot_parameters)== "ylab"  ) )==0 ){
         plot_parameters[["ylab"]] = ""
