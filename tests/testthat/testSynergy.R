@@ -40,4 +40,22 @@ test_that("synergy works", {
        values = syn$values, negative_control = NA), 
        "treatment_1 and treatments_2 must be strings, not factors" )
    
+   # test specifying treatment columns 
+   ds = create_synergy_dataset( sample_types=rep("s1", 10), 
+        treatments_1 = c( "DMSO", rep("d1",4), rep("DMSO", 5) ),
+        treatments_2 = c( rep("DMSO", 5), "DMSO", rep("d2",4) ),
+        concentrations_1 = c(0, 100, 200, 400, 800, 0, 0,   0,   0,   0), 
+        concentrations_2 = c(0, 0,   0,   0,   0,   0, 100, 200, 400, 800),
+        values=c(100, 100, 80, 60, 20, 100, 100, 80, 60, 20 ), 
+        negative_control = "DMSO" )
+    expect_equal( dim(ds)[1], 10)
+    expect_equal( sum(ds$treatment=="DMSO"), 6 )
+    expect_equal( sum(ds$treatment_2=="DMSO"), 6 )
+    expect_equal( sum(ds$treatment==ds$treatment_2), 2 )
+    expect_equal( ds$concentration, c(0,100,200,400,800,0,0,0,0,0))
+    expect_equal( ds$concentration_2, c(0,0,0,0,0,0,100,200,400,800))
+    expect_equal( ds$is_negative_control, rep( c(TRUE, rep(FALSE,4)), 2 ) )
+    expect_equal( ds$is_negative_control_2, rep( c(TRUE, rep(FALSE,4)), 2 ) )
+    expect_equal( ds$value_normalized, c(1,1,0.8,0.6,0.2,1,1,0.8,0.6,0.2) )
+    fit_DRC(ds, drc::LL.2(), treatments = "d1" )
 } )
