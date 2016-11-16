@@ -77,7 +77,17 @@ read_platemap_from_Incucyte_XML = function( path_to_file,
                 }
             }
         }
-    }    
+    }
+    pm$treatment[pm$treatment==""] = NA
+    pm$sample_type[pm$sample_type==""] = NA
+    pm$density[pm$density==""] = NA
+    pm$passage[pm$passage==""] = NA
+    if( "concentration_2" %in% names(pm) ){
+        pm$concentration_2[pm$concentration_2==""] = NA   
+    }
+    if( "treatment_2" %in% names(pm) ){
+        pm$treatment_2[pm$treatment_2==""] = NA   
+    }
     pm
 } 
 
@@ -119,7 +129,8 @@ read_platemap_from_excel = function( filename, sheet_num=1, number_of_wells,
                                      sample_identifier="cell line",
                                      na.strings=c("", "NA") ){
     
-    xl = readxl::read_excel(filename, sheet=sheet_num, col_names = FALSE)
+    xl = data.frame( readxl::read_excel(filename, sheet=sheet_num, 
+                                        col_names = FALSE) )
     ROWS = plate_dimensions_from_wells(number_of_wells)$rows
     COLS = plate_dimensions_from_wells(number_of_wells)$cols
     idx_conc = which(  tolower( xl[,1] ) == concentration_identifier )
@@ -328,7 +339,7 @@ read_plates_from_Incucyte_export = function( path_to_file, plate_id,
                                              number_of_wells, sheet_num=1, 
                                              plate_mask = NA){
     
-    xl = readxl::read_excel(path_to_file, sheet=sheet_num)
+    xl = data.frame( readxl::read_excel(path_to_file, sheet=sheet_num) )
     n_xl_rows = dim(xl)[1]
     n_xl_cols = dim(xl)[2]
     idx_plate_top = which( xl[,1] == "Time Stamp:" )
@@ -352,7 +363,7 @@ read_plates_from_Incucyte_export = function( path_to_file, plate_id,
     }
     
     for(i in 1:length(idx_plate_top)){
-        hour = xl[idx_plate_top[i], 4]
+        hour = as.numeric( xl[idx_plate_top[i], 4] )
         plate = create_empty_plate( number_of_wells, hour, plate_id)
         row_a1 = idx_plate_top[i]+2
         col_a1 = 2
@@ -440,16 +451,28 @@ read_dataset = function(filepath, negative_control=NA, plate_id="plate_1",
         stop( "dataset file must contain a column labeled 'value'")
     }
     hours=0
-    if( "hour" %in% names(ds) ){
-        hours = ds$hour
+    if( ! "hour" %in% names(ds) ){
+        ds$hour = rep(0, dim(ds)[1])   
     }
-    if( sum(! is.numeric(ds$hour))>0 ){
+    hours = ds$hour
+    if( sum(! is.numeric(ds$hour) )>0 ){
         stop("'hour' column must be numeric")
     }
-    
+    if( "concentration_2" %in% names(ds) ){
+        concentrations_2 = ds$concentration_2   
+    }else{
+        concentrations_2 = NULL
+    }
+    if( "treatment_2" %in% names(ds) ){
+        treatments_2 = ds$treatment_2   
+    }else{
+        treatments_2 = NULL
+    }    
     create_dataset(sample_types=ds$sample_type, 
                    treatments = ds$treatment,
+                   treatments_2 = treatments_2,
                    concentrations = ds$concentration, 
+                   concentrations_2 = concentrations_2,
                    hours = hours,
                    values = ds$value,
                    plate_id= plate_id,

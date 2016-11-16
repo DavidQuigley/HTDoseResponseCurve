@@ -204,29 +204,39 @@ AUC.HT_fit = function(FIT, granularity=0.01, summary_method="mean"){
                 idx_last =  max( which(cond_test==cur_cond ) )
                 ys = preds[ idx_first : idx_last ]
                 ys[ys<0]=0 # No negative values allowed for AUC
-                idx_b = which(names(stats::coefficients(FIT$model))==
-                                  paste("b",cur_cond,sep=":"))
-                idx_c = which(names(stats::coefficients(FIT$model))==
-                                  paste("c",cur_cond,sep=":"))
-                idx_d = which(names(stats::coefficients(FIT$model))==
-                                  paste("d",cur_cond,sep=":"))
-                idx_e = which(names(stats::coefficients(FIT$model))==
-                                  paste("e",cur_cond,sep=":"))
+                nn=names(stats::coefficients(FIT$model))
+                idx_b = which(nn=="b:(Intercept)")
+                idx_c = which(nn=="c:(Intercept)")
+                idx_d = which(nn=="d:(Intercept)")
+                idx_e = which(nn=="e:(Intercept)")
+                if(length(idx_b)==0 ){
+                    idx_b = which(nn==paste("b",cur_cond,sep=":"))
+                }
+                if(length(idx_c)==0 ){
+                    idx_c = which(nn==paste("c",cur_cond,sep=":"))
+                }
+                if(length(idx_d)==0 ){
+                    idx_d = which(nn==paste("d",cur_cond,sep=":"))
+                }
+                if(length(idx_e)==0 ){
+                    idx_e = which(nn==paste("e",cur_cond,sep=":"))
+                }
+                
                 if(length(idx_b)>0){
-                   coef_b[i] = as.numeric(stats::coefficients(FIT$model)[idx_b])
+                    coef_b[i] = as.numeric(stats::coefficients(FIT$model)[idx_b])
                 }
                 if(length(idx_c)>0){
-                   coef_c[i] = as.numeric(stats::coefficients(FIT$model)[idx_c])
+                    coef_c[i] = as.numeric(stats::coefficients(FIT$model)[idx_c])
                 }else{
                     coef_c[i] = 0
                 }
                 if(length(idx_d)>0){
-                   coef_d[i] = as.numeric(stats::coefficients(FIT$model)[idx_d])
+                    coef_d[i] = as.numeric(stats::coefficients(FIT$model)[idx_d])
                 }else{
                     coef_d[i] = 1
                 }
                 if(length(idx_e)>0){
-                   coef_e[i] = as.numeric(stats::coefficients(FIT$model)[idx_e])
+                    coef_e[i] = as.numeric(stats::coefficients(FIT$model)[idx_e])
                 }
                 auc[i] = pracma::trapz(conc_to_fit, ys) / max_concentration
                 if( min( observed, na.rm=TRUE) > 0.5 ){
@@ -516,10 +526,12 @@ prepare_for_normalization = function( D, negative_control ){
         if( is_synergy ){
             neg_ctl = rep( negative_control, dim(D)[1])
             neg_ctl_2 = rep( negative_control, dim(D)[1])
-            is_neg_ctl = !is.na(D$treatment) & !is.na(D$treatment_2) & 
-                         D$treatment==negative_control & 
-                         D$treatment_2==negative_control
-            is_neg_ctl_2 = is_neg_ctl
+            #is_neg_ctl = !is.na(D$treatment) & !is.na(D$treatment_2) & 
+            #             D$treatment==negative_control & 
+            #             D$treatment_2==negative_control
+            #is_neg_ctl_2 = is_neg_ctl
+            is_neg_ctl = !is.na(D$treatment) & D$treatment==negative_control 
+            is_neg_ctl_2 = !is.na(D$treatment_2)&D$treatment_2==negative_control
         }else{
             neg_ctl = rep( negative_control, dim(D)[1])
             is_neg_ctl = !is.na(D$treatment) & D$treatment==negative_control
@@ -683,7 +695,11 @@ normalize_by_vehicle = function( D, summary_method ){
 #' }
 #' @param plate_id Text string identifying this experiment, useful if 
 #' multiple datasets are later combined. Defaults to "plate_1".
-#' @param summary_method Method used to combine replicate measures into a single 
+#' @param treatments_2 vector of second treatments, used for synergy datasets. 
+#' Defaults to NULL, meaning only a single treatment per well.
+#' @param concentrations_2 vector of second concentrations, used for synergy 
+#' datasets. Defaults to NULL, meaning only a single treatment per well.
+#' #' @param summary_method Method used to combine replicate measures into a single 
 #' value; must be one of "mean", "median". Defaults to "mean".
 #' @return A data frame where columns indicate the sample type, treatment, 
 #' concentration, observed raw value, normalized value,
@@ -739,6 +755,7 @@ normalize_by_vehicle = function( D, summary_method ){
 #' @export
 create_dataset = function( sample_types, treatments, concentrations, values, 
                            hours=0, plate_id="plate_1", negative_control = NA,
+                           treatments_2 = NULL, concentrations_2 = NULL,
                            summary_method="mean"){
     if( length(plate_id) != 1 ){
         stop("parameter plate_id should be a single string")   
@@ -756,6 +773,24 @@ create_dataset = function( sample_types, treatments, concentrations, values,
         stop( paste("parameters sample_types, treatments, concentrations,",
                     "values, and hours must have the same length"))
     }
+    if( !is.null( treatments_2 ) ){
+        if(length(treatments_2) != length( treatments ) ){
+            stop(paste("parameters treatments and treatments_2 must have the",
+                        "same length") )
+        }
+    }
+    if( !is.null( concentrations_2 ) ){
+        if(length(concentrations_2) != length( concentrations ) ){
+            stop(paste("parameters concentrations and concentrations_2 must ",
+                       "have the same length") )
+        }
+    }
+    if( (!is.null( treatments_2 ) & is.null( concentrations_2)) | 
+        (is.null( treatments_2 ) & !is.null( concentrations_2) ) ){
+        stop(paste("if either concentrations_2 or treatments_2 is passed, both",
+            "parameters must be passed and must have the same length") )
+    }
+    
     df = data.frame( sample_type=sample_types, 
                      treatment=treatments, 
                      concentration=concentrations, 
@@ -766,6 +801,10 @@ create_dataset = function( sample_types, treatments, concentrations, values,
                      negative_control = rep(NA, length(values) ),
                      is_negative_control = rep(NA, length(values) ),
                      stringsAsFactors=FALSE )
+    if(!is.null(treatments_2)){
+        df = cbind( df, treatment_2=treatments_2, 
+                    concentration_2=concentrations_2, stringsAsFactors=FALSE)   
+    }
     df = prepare_for_normalization( df, negative_control ) 
     normalize_by_vehicle(df, summary_method=summary_method )
 }
@@ -1116,6 +1155,50 @@ metric_to_grid = function( x_axis_labels, y_axis_labels, values ){
 }
 
 
+
+#' given a synergy dataset plot multiple dose response curves for 
+#' drug A separated by individual concentrations of drug B. Standardizes new 
+#' dataset to have drug A as in the columns "treatment" and "concentration". 
+#' Creates new sample types, one for each dose of drug B. The resulting 
+#' dataset can then be passed through to fit_DRC without modification.
+#' 
+#' @param D experiment dataset with columns matching the output of 
+#' \code{combine_data_and_map}
+#' @param sample_type single sample type present in D
+#' @param treatment_a treatment present in D that will be plotted at all 
+#' concentrations in each dose response curve
+#' @param treatment_b treatment present in D that will be used to divide 
+#' readings into distinct dose response curves
+#' @param concentrations_a concentrations of treatment A present in D. Do not 
+#' pass the concentration of the vehicle, if one is present. 
+#' @param concentrations_b concentrations of treatment B present in D. Do not 
+#' pass the concentration of the vehicle, if one is present. 
+#' @export
+convert_dataset_for_synergy_DRC = function( D, sample_type, 
+                            treatment_a = "", treatment_b = "",
+                            concentrations_a = NULL, concentrations_b = NULL){
+    
+    ds_type = is_dataset_valid(D, sample_types=c(sample_type), 
+                               treatments = c(treatment_a, treatment_b))
+    if( ds_type != 2 ){
+        stop("This function can only be called on synergy datasets")   
+    }
+    D_s = D[D$sample_type==sample_type, ]
+
+    D_std = standardize_treatment_assigments(D_s, treatment_a, treatment_b)
+    cols=c("sample_type", "treatment", "treatment_2", "concentration_2")
+    D_std$sample_type = apply( D_std[ , cols ], 1, paste , collapse = "_" )
+    #D_std=D_std[ ( D_std$treatment == treatment_a & D_std$treatment_2 == treatment_b & 
+    #                   D_std$concentration_2 %in% concentrations_b ) | 
+    
+    D_std=D_std[ ( D_std$treatment == treatment_a & 
+                   D_std$treatment_2 == treatment_b & 
+                   D_std$concentration_2 %in% concentrations_b ) | 
+#                ( D_std$is_negative_control & D_std$is_negative_control_2 ),]                     
+                 ( D_std$is_negative_control_2 ),]    
+    D_std[order(D_std$concentration_2),] 
+}
+    
 #' Attempt to fit a dose-response curve from the dataset and calculate AUC.
 #'
 #' Given a data frame of measurements generated by 
@@ -1291,6 +1374,87 @@ fit_DRC = function(D, fct, sample_types=NA, treatments=NA, hour=NA,
     FIT=AUC( FIT )
     drm_settings = drc::drmc( errorm = TRUE )
     FIT
+}
+
+
+#' Attempt to fit multiple dose-response curves for a range of doses for 
+#' treatment_a, broken out by individual doses of treatment_b.
+#'
+#' Given a data frame of measurements generated by 
+#' \code{\link{combine_data_and_map}} or matching the format generated by that 
+#' function, fit a dose-response curve for each unique sample_type/treatment 
+#' specified by the sample_types and treatments parameters. A curve will 
+#' be fit for each sample in sample_types, at each treatment in treatments.
+#' 
+#' If the data are from a synergy experiment, you must specify the concentration
+#' to use for the curve in the concentration_column parameter as one of 
+#' {concentration, concentration_2}.
+#' 
+#' @section Non-linear function for curve fitting:
+#' 
+#' Curve fitting is performed by the \code{drm()} function in the \code{drc} 
+#' library. To fit the curve, you need to select a non-linear function. To 
+#' estimate the slope, upper asymptote, lower asymptote, and EC50, pass 
+#' drc::LL.4(). To fix the lower asymptote at 1 and estimate the other 
+#' parameters, pass drc::LL.3(). To fix the upper asympotote at 1 and the lower 
+#' asymptote at 0, pass drc::LL.2. For a list of available functions, see 
+#' \code{drc::getMeanFunctions()}. 
+#' 
+#' To call this function you must load the drc package in your R session.
+#' @param D experiment dataset with columns matching the output of 
+#' \code{combine_data_and_map}
+#' @param fct Non-linear function to fit, e.g. drc::LL.3(). See summary. 
+#' @param sample_type Which sample type (e.g. distinct cell line) of the 
+#' sample types in D will be fit. Unlike fit_DRC, a single sample type must 
+#' be passed.
+#' @param hour The hour in experiment dataset D at which to fit. 
+#' @param treatment_for_DRC treatment whose values will be used to plot 
+#' individual dose-response curves
+#' @param treatment_subgroups treatment that will be used to subgroup 
+#' measurements of treatment_for_DRC
+#' @param concentrations_for_DRC concentrations used for treatment_for_DRC. 
+#' Defaults to NA, use all valid concentrations 
+#' @param concentrations_subgroups concentrations used for treatment_subgroups. 
+#' Defaults to NA, use all valid concentrations 
+#' 
+#' @return A list with elements fit, a HT_fit object, and legend_details, a 
+#' data frame that indicates the correspondence between the plot colors that 
+#' will be chosen by default if plot(fit) is called and the concentration of 
+#' treatment_b.
+#' @import drc
+#' @export
+fit_DRC_synergy = function(ds, fct, sample_type, hour, 
+                           treatment_for_DRC=NA, treatment_subgroups, 
+                           concentrations_for_DRC=NA, 
+                           concentrations_subgroups=NA){
+    if( length(sample_type) != 1 ){
+        stop("a single sample_type must be passed")   
+    }
+    ds_syn=convert_dataset_for_synergy_DRC( ds,
+                                            sample_type = sample_type, 
+                                            treatment_a = treatment_for_DRC, 
+                                            treatment_b = treatment_subgroups,
+                                            concentrations_a = 
+                                                concentrations_for_DRC,
+                                            concentrations_b = 
+                                                concentrations_subgroups )
+    samples=unique(ds_syn$sample_type[!ds_syn$is_negative_control])
+    fit_syn = fit_DRC(ds_syn, 
+                      sample_types = samples,
+                      treatments = treatment_for_DRC,
+                      fct=fct, hour = hour)
+    
+    fpc = HT_fit_plot_colors(fit_syn)
+    concentration=rep(0, length(fpc$condition))
+    for(i in 1:length(concentration)){
+        concentration[i] = strsplit( 
+            strsplit( fpc$condition[i], split = "_|_", fixed = TRUE)[[1]][1], 
+            split="_", fixed=TRUE)[[1]][4]  
+    }
+    fpc = data.frame( col=fpc$col, 
+                      concentration=as.numeric(concentration), 
+                      stringsAsFactors=FALSE)
+    list(fit=fit_syn, legend_details=fpc)
 }
 
 #' Summarize the results of a dose response fit

@@ -54,8 +54,9 @@ test_that("synergy works", {
     expect_equal( sum(ds$treatment==ds$treatment_2), 2 )
     expect_equal( ds$concentration, c(0,100,200,400,800,0,0,0,0,0))
     expect_equal( ds$concentration_2, c(0,0,0,0,0,0,100,200,400,800))
-    expect_equal( ds$is_negative_control, rep( c(TRUE, rep(FALSE,4)), 2 ) )
-    expect_equal( ds$is_negative_control_2, rep( c(TRUE, rep(FALSE,4)), 2 ) )
+    expect_equal( ds$is_negative_control, 
+                  c( TRUE, FALSE, FALSE, FALSE, FALSE, rep( TRUE, 5 ) ) )
+    expect_equal( ds$is_negative_control_2,
+                  c( rep(TRUE, 6), rep(FALSE, 4) ) )
     expect_equal( ds$value_normalized, c(1,1,0.8,0.6,0.2,1,1,0.8,0.6,0.2) )
-    fit_DRC(ds, drc::LL.2(), treatments = "d1" )
 } )

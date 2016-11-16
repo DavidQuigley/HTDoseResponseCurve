@@ -16,6 +16,7 @@
 #' @param main Plot main title, default blank.
 #' @param xlab Plot x axis label, default blank.
 #' @param ylab Plot y axis label, default blank.
+#' @param plot_values draw element values in the grid blocks, default FALSE
 #' @return M, including possible truncation from color bounds
 #' @examples 
 #' M = matrix(1:12, nrow=3, ncol=4,byrow=TRUE)
@@ -30,7 +31,7 @@ plot_color_grid = function(M, block.height=20, block.width=10, space.X=3,
                          space.Y=10, cex.x=1, cex.y=1, border=TRUE, 
                          color_palatte=c("blue","white","red"), 
                          color_bounds=NA, num_colors=50, 
-                         main="", xlab="", ylab="" ) {
+                         main="", xlab="", ylab="", plot_values=FALSE ) {
     
     cmap = grDevices::colorRampPalette( colors=color_palatte )( num_colors )
     if( is.na(color_bounds)[1] ){
@@ -61,12 +62,18 @@ plot_color_grid = function(M, block.height=20, block.width=10, space.X=3,
             this.x.left = (cc-1)*block.width + (cc-1)*space.X
             this.x.right = this.x.left+block.width
             xlab_locs[cc] = this.x.right - (block.width)
-            if( border )
+            if( border ){
                 graphics::rect( this.x.left , cur.y - block.height, 
                             this.x.right, cur.y, col=MC[rr,cc], border="azure2")
-            else
+            }else{
                 graphics::rect( this.x.left , cur.y - block.height,this.x.right, 
                                 cur.y, col=MC[rr,cc], border=NA)
+            }
+            if( plot_values ){
+                text( this.x.right - (block.width/2), 
+                      cur.y - (block.height/2), 
+                      M[rr,cc], cex=0.75 )
+            }
         }
         ylab_locs[rr] = cur.y - (0.5*block.height)
         cur.y = cur.y - block.height - space.Y
@@ -76,6 +83,30 @@ plot_color_grid = function(M, block.height=20, block.width=10, space.X=3,
     graphics::axis(2, at=ylab_locs, labels=dimnames(MC)[[1]], las=2, 
                    cex.axis=cex.y, tick=FALSE, hadj=1, line=-1.5)
     M
+}
+
+#' Report colors that will be used when plotting a HTfit object. 
+#' 
+#' If a vector of colors is passed to col, these colors will be used instead 
+#' of the default colors. 
+#' 
+#' @param F HTfit object
+#' @param col optional vector of valid R colors to be used for the plot; 
+#' defaults to the color scheme built into HTDoseResponseCurve.
+#' @return data frame of unique condition, color
+#' @export
+HT_fit_plot_colors=function( F, col=NULL ){
+    N = length(F$unique_conditions)
+    if( is.null(col) ){
+        col = INC_colors_DRC[1:N]
+    }else{
+         if(length(col)<N){
+            stop(paste("Must provide",N,"colors to plot this figure"))   
+         }
+    }
+    uc = as.character( unique( F$input$conditions_to_fit ) )
+    
+    data.frame(condition=uc, col=col, stringsAsFactors=FALSE)
 }
 
 #' Plot a dose response curve from a HTfit object
@@ -163,9 +194,9 @@ plot.HT_fit = function( x, ..., bar_multiple=2,
     if( !log_axis_x ){
         plot_parameters[["log"]] = ""   
     }
-    uc = as.character(unique(x$input$conditions_to_fit))
+    pc = HT_fit_plot_colors( x, col=plot_parameters[["col"]][ 1:N ] )
+    cond2color = hsh_from_vectors(pc$condition, pc$col)
     
-    cond2color = hsh_from_vectors( uc, plot_parameters[["col"]][1:length(uc)] )
     Mstat = plyr::ddply( x$input, c("conditions_to_fit", "concentration"), 
                          function(po){ data.frame( 
                              mu=mean(po$value, na.rm=TRUE), 
@@ -421,6 +452,7 @@ plot_values_by_plate = function( plate, hour=NA, color_bounds=c(0,100),
     graphics::box()
 }
 
+
 #' Plot an time course of the raw intensities 
 #' 
 #' @param D experiment dataset with columns matching the output of 
@@ -430,7 +462,10 @@ plot_values_by_plate = function( plate, hour=NA, color_bounds=c(0,100),
 #' @param concentrations which concentrations to draw
 #' @param plot_raw plot un-normalized raw values, defaults TRUE. If FALSE, 
 #' plots value_normalized.
+#' @param show_raw_vehicle If TRUE and plot_raw is TRUE, plot un-normalized 
+#' raw vehicle values. Defaults FALSE. 
 #' @param ... standard parameters for \code{plot} function
+#' @param cex.xaxis size coefficient for X axis, default 1
 #' @param cex.yaxis size coefficient for Y axis, default 2
 #' @param axis.font font value for axis, default 2 (bold)
 #' @param summary_method summary method for points to plot in timecourse, one 
@@ -451,25 +486,29 @@ plot_values_by_plate = function( plate, hour=NA, color_bounds=c(0,100),
 #' @export
 plot_timecourse = function( D, sample_types, treatments, 
                                 concentrations, plot_raw=TRUE, 
-                                ..., cex.yaxis=2, axis.font=2,
+                                show_raw_vehicle=FALSE,
+                                ..., cex.xaxis=1, cex.yaxis=2, axis.font=2,
                                 summary_method="mean"){
     if( summary_method != "mean" & summary_method != "median"){
         stop("summary_method parameter must be either mean or median")
     }
+    if( show_raw_vehicle & !plot_raw ){
+        stop("show_raw_vehicle==TRUE cannot be called without plot_raw==TRUE")   
+    }
     for(i in 1:length(sample_types)){
-        if( sum(D$sample_type==sample_types[i])==0 ){
+        if( sum(D$sample_type==sample_types[i], na.rm=TRUE)==0 ){
             stop( paste("sample type", sample_types[i],
                         "in parameter sample_types not found in D") )
         }
     }
     for(i in 1:length(treatments)){
-        if( sum(D$treatment==treatments[i])==0 ){
+        if( sum(D$treatment==treatments[i], na.rm=TRUE)==0 ){
             stop( paste("treatment", treatments[i],
                         "in parameter treatments not found in D") )
         }
     }
     for(i in 1:length(concentrations)){
-        if( sum(D$concentration==concentrations[i])==0 ){
+        if( sum(D$concentration==concentrations[i], na.rm=TRUE)==0 ){
             stop( paste("concentration",concentrations[i],
                         "in parameter concentrations not found in D") )
         }
@@ -481,41 +520,69 @@ plot_timecourse = function( D, sample_types, treatments,
         stop(paste("No matches for this combination of sample_types,",
                    "treatments, and concentrations"))
     }
+    if( plot_raw & show_raw_vehicle ){
+        # identify vehicle rows for each combination of sample_type+treatment
+        veh = unique(ds_cur[,c("negative_control", "sample_type", "plate_id")])
+        for( i in 1:dim(veh)[2] ){
+            idx = which( D$treatment==veh$negative_control[i] & 
+                         D$plate_id==veh$plate_id[i] & 
+                         D$sample_type==veh$sample_type[i] )
+            ds_cur = rbind(ds_cur, D[idx,] )   
+        }
+    }
+    
     hours = sort( unique( ds_cur$hours ) )
-    unique_concs = sort( unique(concentrations) )
+    unique_concs = sort( unique(ds_cur$concentration) )
     unique_lines = sort( unique(sample_types) )
     unique_treatments = sort( unique (treatments ) )
+    
+    plot_parameters = list(...)
+    if( length( which( names(plot_parameters)=="pch") ) > 0 ){
+        if( length( plot_parameters[["pch"]]) != length(unique_lines) ){
+            stop(paste("Passed pch parameter with",
+                       length(plot_parameters[["pch"]]),
+                       "elements but need to plot",length(unique_lines),
+                       "unique lines"))
+        }
+        line2pch = hsh_from_vectors( as.character(unique_lines) , 
+                                     plot_parameters[["pch"]] )
+    }else{
+        line2pch = hsh_from_vectors( as.character(unique_lines) , 
+                                 INC_pches[1:length(unique_lines)] )
+    }
+    
+    # If plotting raw data, plot one curve for each plate.
+        Mstat = plyr::ddply( 
+            .data=ds_cur, 
+            .variables=c("sample_type", "hours", "concentration"), 
+            summarize, 
+            mu_raw = mean( value, na.rm=TRUE ),
+            med_raw = stats::median( value, na.rm=TRUE ), 
+            mu_norm = mean( value_normalized, na.rm=TRUE ),
+            med_norm = stats::median( value_normalized, na.rm=TRUE ), 
+            sample_type=unique( sample_type ) ,
+            concentration=unique( concentration )  )
+    if( plot_raw ){
+        if( summary_method=="mean"){
+            values = Mstat$mu_raw
+        }else{
+            values = Mstat$med_raw
+        }            
+    }else{
+        if( summary_method=="mean"){
+            values = Mstat$mu_norm
+        }else{
+            values = Mstat$med_norm
+        }
+    }
+    
     conc2color = hsh_from_vectors( as.character(unique_concs) , 
                                    INC_colors_DRC[ 1:length(unique_concs) ] )
+    Mstat = cbind( Mstat, 
+                   color =hsh_get(conc2color,as.character(Mstat$concentration)), 
+                   pch = hsh_get( line2pch, Mstat$sample_type),
+                   stringsAsFactors=FALSE)
     
-    line2pch = hsh_from_vectors( as.character(unique_lines) , 
-                                 INC_pches[1:length(unique_lines)] )
-        Mstat = plyr::ddply( ds_cur, c("sample_type", "hours", "concentration"), 
-                         function(x){ 
-        data.frame(
-            mu_raw = mean(x$value, na.rm=TRUE),
-            med_raw = stats::median(x$value, na.rm=TRUE), 
-            mu_norm = mean(x$value_normalized, na.rm=TRUE),
-            med_norm = stats::median(x$value_normalized, na.rm=TRUE), 
-            color=hsh_get( conc2color, as.character(x$concentration) ), 
-            pch = hsh_get( line2pch, x$sample_type),
-            sample_type=x$sample_type,
-            concentration=x$concentration, stringsAsFactors=FALSE)}
-        )
-    
-    if( summary_method=="mean" & plot_raw ){
-        values = Mstat$mu_raw
-    }
-    else if( summary_method=="mean" & !plot_raw ){
-        values = Mstat$mu_norm
-    }
-    else if( summary_method=="median" & !plot_raw ){
-        values = Mstat$med_raw
-    }
-    else if( summary_method=="medan" & !plot_raw ){
-        values = Mstat$med_norm
-    }
-    plot_parameters = list(...)
     plot_parameters[["xlim"]] = c(0, max(hours))
     plot_parameters[["axes"]] = FALSE
     plot_parameters[["pch"]] = Mstat$pch
@@ -537,7 +604,7 @@ plot_timecourse = function( D, sample_types, treatments,
     do.call( graphics::plot, plot_parameters )
     graphics::axis(2, c(ylim[1], (ylim[2])/2, ylim[2]), las=1, 
                    cex.axis=cex.yaxis,font= axis.font )
-    graphics::axis(1, round(hours,1), las=2, cex.axis=1, font=axis.font )
+    graphics::axis(1, round(hours,1), las=2, cex.axis=cex.xaxis, font=axis.font )
     graphics::box()
     unique(Mstat)
 }
@@ -879,3 +946,97 @@ plot_chou_synergy_Fa_CI = function( CS, ..., show_horizontal=TRUE  ){
             col=plot_parameters[["col"]] )
 }
 
+#' Plot an time course of the raw intensities 
+#' 
+#' @param ds synergy experiment dataset with columns matching the output of 
+#' \code{combine_data_and_maps}
+#' @param sample_type which sample type to draw; only one can be specified
+#' @param treatment_a which of two synergy treatments is labeled treatment A
+#' @param treatment_b which of two synergy treatments is labeled treatment B 
+#' @param hour which hour to use from dataset ds, defaults to 0
+#' @param normalize plot isobologram normalized so that the EC50 for each axis
+#' is normalized to value 1, with other concentrations relative to this value
+#' @param xmax highest value for X axis (treatment A)
+#' @param ymax highest value for Y axis (treatment B)
+#' @return list( fit_a, fit_b, IC50_a, IC50_b, iso) where fit_a and fit_b are 
+#' the fit of treatments A and B alone, IC50_a and IC50_b, and isobologram, a 
+#' data frame of the points X and Y that were plotted
+#' @export 
+plot_isobologram = function( ds, sample_type, treatment_a, treatment_b, hour=0,
+                             normalize=TRUE, xmax=NA, ymax=NA){
+    if( length(sample_type) != 1 ){
+        stop("must call with a single sample type")   
+    }
+    TA = treatment_a
+    TB = treatment_b
+    ds_a = standardize_treatment_assigments( ds, TA, TB )
+    ds_b = standardize_treatment_assigments( ds, TB, TA )
+    ds_a_only = ds_a[ds_a$treatment != TB & ds_a$treatment_2 != TB,]
+    ds_b_only = ds_b[ds_b$treatment != TA & ds_b$treatment_2 != TA,]
+    fit_a = fit_DRC(ds_a_only, sample_types = c(sample_type), treatments = TA, 
+                    fct=LL.3(), hour = hour)
+    fit_b = fit_DRC(ds_b_only, sample_types = c(sample_type), treatments = TB, 
+                    fct=LL.3(), hour = hour)
+    IC50_a = fit_a$fit_stats$coef_EC50
+    IC50_b = fit_b$fit_stats$coef_EC50
+    if( normalize ){
+        xmax=2
+        ymax=2
+        plot( 1, 0, xlim=c(0, xmax), ylim=c(0, ymax), xaxs="i", yaxs="i", 
+              pch=19, xlab=treatment_a, ylab=treatment_b)
+        points( 0, 1, pch=19)
+        lines( c(0,1), c(1,0), lwd=2)
+    }else{
+        if( is.na(xmax) ){
+            xmax = max( ds_a$concentration[ds$treatment==TA], na.rm=TRUE )
+        }
+        if( is.na(ymax) ){
+            ymax = max( ds_b$concentration[ds$treatment==TB], na.rm=TRUE )   
+        }
+        plot( IC50_a, 0, xlim=c(0, xmax), ylim=c(0, ymax), xaxs="i", yaxs="i", 
+              pch=19, xlab=treatment_a, ylab=treatment_b)
+        points( 0, IC50_b, pch=19)
+        lines( c(0, IC50_a), c(IC50_b, 0), lwd=2 )
+    }
+    # fit concentration for each concentration_2, 
+    # estimate IC50, plot conc_IC50, conc_2
+    concs_a = sort(unique(ds_a$concentration[!ds_a$is_negative_control]))
+    concs_b = sort(unique(ds_b$concentration[!ds_b$is_negative_control]))
+    iso_x = c()
+    iso_y = c()
+    for(i in 1:length(concs_b)){
+        ds_iso=convert_dataset_for_synergy_DRC( ds_a[ds_a$hours==hour,],
+                                                sample_type=sample_type,
+                                                treatment_a = TA, treatment_b = TB,
+                                                concentrations_a = concs_a,
+                                                concentrations_b= concs_b[i])
+        fit_par = fit_DRC(ds_iso, 
+                          sample_types = unique(ds_iso$sample_type[!ds_iso$is_negative_control]),
+                          treatments = TA,
+                          fct=LL.4(), hour = hour)
+        iso_x = c( iso_x, fit_par$fit_stats$coef_EC50[2] )
+        iso_y = c( iso_y, concs_b[i] )
+    }
+    for(i in 1:length(concs_a)){
+        ds_iso=convert_dataset_for_synergy_DRC( ds_b[ds_b$hours==hour,],
+                                                sample_type=sample_type,
+                                                treatment_a = TB, treatment_b = TA,
+                                                concentrations_a = concs_b,
+                                                concentrations_b= concs_a[i])
+        fit_par = fit_DRC(ds_iso, 
+                          sample_types = unique(ds_iso$sample_type[!ds_iso$is_negative_control]),
+                          treatments = TB,
+                          fct=LL.4(), hour = hour)
+        iso_x = c( iso_x, fit_par$fit_stats$coef_EC50[2] )
+        iso_y = c( iso_y, concs_a[i] )
+    }
+    
+    if( normalize ){
+        iso_x = iso_x / IC50_a
+        iso_y = iso_y / IC50_b
+    }
+    
+    points( iso_x, iso_y )
+    iso = data.frame( x=iso_x, y=iso_y )
+    list( fit_a, fit_b, IC50_a, IC50_b, isobologram=iso)
+}
