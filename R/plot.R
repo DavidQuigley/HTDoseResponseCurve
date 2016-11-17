@@ -1040,3 +1040,62 @@ plot_isobologram = function( ds, sample_type, treatment_a, treatment_b, hour=0,
     iso = data.frame( x=iso_x, y=iso_y )
     list( fit_a, fit_b, IC50_a, IC50_b, isobologram=iso)
 }
+
+#' Plot additive vs. synergy effect for a given concentration of one drug
+#' 
+#' @param ds synergy experiment dataset with columns matching the output of 
+#' \code{combine_data_and_maps}
+#' @param treatment_for_DRC the treatment to vary across different doses
+#' @param concs_for_DRC concentrations of treatment_for_DRC to show on X axis
+#' @param treatment_subgroup the treatment to hold constant
+#' @param concs_subgroup concentration of subgroup treatment
+#' @param hour which hour to use from dataset ds, defaults to 0
+#' @param sample_type sample type to draw; only one can be specified
+#' @export 
+plot_additive_vs_synergy_effect = function( ds, 
+                                            treatment_for_DRC, concs_for_DRC, 
+                                            treatment_subgroup, conc_subgroup, 
+                                            hour, sample_type ){
+    # standardize treatment assignments and restrict to relevant time/sample
+    ds_std = ds[ds$hours==hour & ds$sample_type==sample_type,]
+    ds_std = standardize_treatment_assigments(ds_std, treatment_for_DRC, 
+                                                          treatment_subgroup )
+    ds_std=ds_std[ c(ds_std$concentration %in% concs_for_DRC & 
+                     ds_std$concentration_2 %in% conc_subgroup )|
+                     ds_std$is_negative_control | ds_std$is_negative_control_2,]
+    
+    # summarize replicates
+    M=plyr::ddply( ds_std, c("treatment", "concentration", 
+                             "treatment_2", "concentration_2",
+                             "is_negative_control", "is_negative_control_2"), 
+                   function(x){ data.frame( 
+                              mu=round(mean(x$value_normalized, na.rm=TRUE),2) ) 
+                   } )
+    
+    # single treatments, putting vehicle first
+    Ma = M[ M$is_negative_control_2,]
+    Ma = Ma[ order( !Ma$is_negative_control, Ma$concentration ),]
+    Mb = M[ M$is_negative_control,]
+    Mb = Mb[ order( !Mb$is_negative_control_2, Mb$concentration_2 ),]
+    Mcomb = M[ (M$is_negative_control & M$is_negative_control_2) | 
+               (!M$is_negative_control & !M$is_negative_control_2), ]
+    Mcomb = Mcomb[ order( !Mcomb$is_negative_control_2, Mcomb$concentration ),]
+    
+    effect_both = rep(NA, length(concs_for_DRC))
+    for( i in 1:length(concs_for_DRC)){
+        effect_both[i] = 1 - Mcomb$mu[ Mcomb$concentration==concs_for_DRC[i] & 
+                                      Mcomb$concentration_2==conc_subgroup ]
+    }
+    
+    effect_DRC = 1 - Ma$mu
+    effect_subgroup = 1 - Mb$mu
+    
+    idx_subgroup = which( Mb$concentration_2 == conc_subgroup )
+    plot( effect_DRC, ylim=c(0, 1), axes=FALSE, ylab="effect", yaxs="i", 
+          main=paste(treatment_subgroup, conc_subgroup),
+          xlab=treatment_for_DRC  )
+    points( rep( effect_subgroup[idx_subgroup], length(effect_DRC)), pch=2 )
+    points( effect_both, pch=19 )
+    axis(2, seq(from=0, to=1, by=.20), las=1)
+    axis(1, at=1:(1+length(concs_for_DRC)), labels=c(0, concs_for_DRC), las=2 )
+}
