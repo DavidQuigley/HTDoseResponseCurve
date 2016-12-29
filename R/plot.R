@@ -24,7 +24,7 @@
 #' dimnames(M)[[1]] = c("row_a","row_b","row_c")
 #' dimnames(M)[[2]] = c("col1", "col2", "col3","col4")
 #' plot_color_grid(M, color_palatte=c("blue","white","yellow" ) )
-#' @importFrom graphics plot rect axis
+#' @importFrom graphics plot rect axis lines points text
 #' @importFrom grDevices colorRampPalette
 #' @export
 plot_color_grid = function(M, block.height=20, block.width=10, space.X=3, 
@@ -70,7 +70,7 @@ plot_color_grid = function(M, block.height=20, block.width=10, space.X=3,
                                 cur.y, col=MC[rr,cc], border=NA)
             }
             if( plot_values ){
-                text( this.x.right - (block.width/2), 
+                graphics::text( this.x.right - (block.width/2), 
                       cur.y - (block.height/2), 
                       M[rr,cc], cex=0.75 )
             }
@@ -122,6 +122,11 @@ HT_fit_plot_colors=function( F, col=NULL ){
 #' of ("mean", "median"), defaults "mean"
 #' @param show_EC50 show dotted vertical lines at EC50 values if they are fit,
 #' default FALSE
+#' @param show_SF50 show dotted vertical lines at SF50 values if they are fit,
+#' default FALSE. Remember that SF50 is the dose that produces a surviving 
+#' fraction of 50%, whereas EC50 is the dose that produces a drop of 50% from 
+#' the minimum to maximum measured effect. Has no effect if the SF50 is not 
+#' reached.
 #' @param show_legend show a legend, default FALSE
 #' @param show_x_log_tics if axes==TRUE and this parameter is TRUE, draw tics 
 #' between each power of 10 scaled appropriately. If axes==TRUE and this 
@@ -157,6 +162,7 @@ HT_fit_plot_colors=function( F, col=NULL ){
 #' @export
 plot.HT_fit = function( x, ..., bar_multiple=2, 
                         summary_method="mean", show_EC50=FALSE, 
+                        show_SF50=FALSE,
                         show_legend=FALSE, show_x_log_tics=TRUE, 
                         show_x_exponent=TRUE, log_axis_x=TRUE){
     if( summary_method!="mean" & summary_method !="median"){
@@ -237,10 +243,24 @@ plot.HT_fit = function( x, ..., bar_multiple=2,
             EC50 = x$fit_stats$coef_EC50 
             for( i in 1:length(EC50) ){
                 if( !is.na(EC50[i]) & !is.infinite(EC50[i]) ){
-                    graphics::lines( c( EC50[i], EC50[i] ), c(0, 0.5), 
+                    y_pred=stats::predict( x$model, 
+                                      data.frame( concentration=EC50[i],
+                                      conditions_to_fit=x$unique_conditions[i]))
+                    graphics::lines( c( EC50[i], EC50[i] ), c(0, y_pred), 
                            col=hsh_get( cond2color,
                                         rownames(x$fit_stats)[i] ),
                            lwd=plot_parameters[["lwd"]], lty=3 )
+                }
+            }
+        }
+        if( show_SF50 ){
+            SF50 = x$fit_stats$SF50
+            for( i in 1:length(SF50) ){
+                if( !is.na(SF50[i]) & !is.infinite(SF50[i]) ){
+                    graphics::lines( c( SF50[i], SF50[i] ), c(0, 0.5), 
+                                     col=hsh_get( cond2color,
+                                                  rownames(x$fit_stats)[i] ),
+                                     lwd=plot_parameters[["lwd"]], lty=3 )
                 }
             }
         }
@@ -286,12 +306,14 @@ plot.HT_fit = function( x, ..., bar_multiple=2,
     }
         
     Mstat$concentration[Mstat$concentration==0] = 1
+    
     graphics::points( Mstat$concentration, Mstat$value, pch = 19, 
             col=hsh_get( cond2color, as.character(Mstat$conditions_to_fit)), 
             cex=plot_parameters[["cex"]])
     if(show_legend){
         graphics::legend( x_legend, 0.45, x$unique_conditions, pch=19,
-                col=hsh_get( cond2color, uc), bty="n", cex=0.75 )    
+                col=hsh_get( cond2color, as.character(Mstat$conditions_to_fit)), 
+                             bty="n", cex=0.75 )    
     }
     
     for(i in 1:dim(Mstat)[1]){
@@ -984,8 +1006,8 @@ plot_isobologram = function( ds, sample_type, treatment_a, treatment_b, hour=0,
         ymax=2
         plot( 1, 0, xlim=c(0, xmax), ylim=c(0, ymax), xaxs="i", yaxs="i", 
               pch=19, xlab=treatment_a, ylab=treatment_b)
-        points( 0, 1, pch=19)
-        lines( c(0,1), c(1,0), lwd=2)
+        graphics::points( 0, 1, pch=19)
+        graphics::lines( c(0,1), c(1,0), lwd=2)
     }else{
         if( is.na(xmax) ){
             xmax = max( ds_a$concentration[ds$treatment==TA], na.rm=TRUE )
@@ -995,8 +1017,8 @@ plot_isobologram = function( ds, sample_type, treatment_a, treatment_b, hour=0,
         }
         plot( IC50_a, 0, xlim=c(0, xmax), ylim=c(0, ymax), xaxs="i", yaxs="i", 
               pch=19, xlab=treatment_a, ylab=treatment_b)
-        points( 0, IC50_b, pch=19)
-        lines( c(0, IC50_a), c(IC50_b, 0), lwd=2 )
+        graphics::points( 0, IC50_b, pch=19)
+        graphics::lines( c(0, IC50_a), c(IC50_b, 0), lwd=2 )
     }
     # fit concentration for each concentration_2, 
     # estimate IC50, plot conc_IC50, conc_2
@@ -1048,14 +1070,14 @@ plot_isobologram = function( ds, sample_type, treatment_a, treatment_b, hour=0,
 #' @param treatment_for_DRC the treatment to vary across different doses
 #' @param concs_for_DRC concentrations of treatment_for_DRC to show on X axis
 #' @param treatment_subgroup the treatment to hold constant
-#' @param concs_subgroup concentration of subgroup treatment
+#' @param conc_subgroup concentration of subgroup treatment
 #' @param hour which hour to use from dataset ds, defaults to 0
 #' @param sample_type sample type to draw; only one can be specified
 #' @export 
 plot_additive_vs_synergy_effect = function( ds, 
                                             treatment_for_DRC, concs_for_DRC, 
                                             treatment_subgroup, conc_subgroup, 
-                                            hour, sample_type ){
+                                            hour, sample_type, ... ){
     # standardize treatment assignments and restrict to relevant time/sample
     ds_std = ds[ds$hours==hour & ds$sample_type==sample_type,]
     ds_std = standardize_treatment_assigments(ds_std, treatment_for_DRC, 
@@ -1080,22 +1102,45 @@ plot_additive_vs_synergy_effect = function( ds,
     Mcomb = M[ (M$is_negative_control & M$is_negative_control_2) | 
                (!M$is_negative_control & !M$is_negative_control_2), ]
     Mcomb = Mcomb[ order( !Mcomb$is_negative_control_2, Mcomb$concentration ),]
-    
-    effect_both = rep(NA, length(concs_for_DRC))
-    for( i in 1:length(concs_for_DRC)){
-        effect_both[i] = 1 - Mcomb$mu[ Mcomb$concentration==concs_for_DRC[i] & 
-                                      Mcomb$concentration_2==conc_subgroup ]
-    }
-    
+    effect_both = 1 - Mcomb$mu
     effect_DRC = 1 - Ma$mu
     effect_subgroup = 1 - Mb$mu
     
     idx_subgroup = which( Mb$concentration_2 == conc_subgroup )
-    plot( effect_DRC, ylim=c(0, 1), axes=FALSE, ylab="effect", yaxs="i", 
-          main=paste(treatment_subgroup, conc_subgroup),
-          xlab=treatment_for_DRC  )
-    points( rep( effect_subgroup[idx_subgroup], length(effect_DRC)), pch=2 )
-    points( effect_both, pch=19 )
+    
+    plot_parameters = list(...)
+
+    if( length( which( names(plot_parameters) == "main"))==0 )
+        plot_parameters[["main"]] = paste(treatment_subgroup, conc_subgroup)    
+    if( length( which( names(plot_parameters) == "ylab"))==0 )
+        plot_parameters[["ylab"]] = 'effect'
+    if( length( which( names(plot_parameters) == "xlab"))==0 )
+        plot_parameters[["xlab"]] = treatment_for_DRC
+    if( length( which( names(plot_parameters) == "col"))==0 ){
+        plot_parameters[["col"]] = c("black","black","black")
+    }
+    if( length( which( names(plot_parameters) == "cex"))==0 ){
+        plot_parameters[["cex"]] = 1
+    }
+    else if( length( plot_parameters[["col"]] )==1 ){
+        color=plot_parameters[["col"]]
+        plot_parameters[["col"]] = c(color, color, color)
+    }else if( length( plot_parameters[["col"]] ) == 3 ){
+            plot_parameters[["col"]] = plot_parameters[["col"]]
+    }else{
+        stop("Must pass either zero, one, or three colors")
+    }
+    if( length( which( names(plot_parameters) == "ylim"))==0 )
+        plot_parameters[["ylim"]] = c(0,1)
+    plot_parameters[["yaxs"]] = "i"
+    plot_parameters[["x"]]=effect_DRC
+    plot_parameters[["axes"]]=FALSE
+    b=do.call( graphics::plot, plot_parameters )
+    graphics::points( rep( effect_subgroup[idx_subgroup], length(effect_DRC)), 
+                      pch=2, col=plot_parameters[["col"]][2], 
+                      cex=plot_parameters[["cex"]] )
+    graphics::points( effect_both, pch=19,col=plot_parameters[["col"]][3],
+                      cex=plot_parameters[["cex"]] )
     axis(2, seq(from=0, to=1, by=.20), las=1)
     axis(1, at=1:(1+length(concs_for_DRC)), labels=c(0, concs_for_DRC), las=2 )
 }
