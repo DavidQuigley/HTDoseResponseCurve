@@ -59,8 +59,8 @@ labeled "DMSO".
 These commands are explained in detail in the next section, "Loading data 
 without plate information".
 
-```{r echo=FALSE}
-library(knitr)
+```{r echo=FALSE, warning=FALSE}
+library(knitr, quietly = TRUE)
 ```
 
 ```{r, fig.height=4, fig.width=4, message=FALSE}
@@ -79,12 +79,12 @@ fit_1 = fit_DRC( ds,
 
 # Plot dose response curve
 plot( fit_1, 
-      xlab="nM drug", ylab="Normalized confluence", 
+      xlab="nM drug", ylab="surviving fraction", 
       xlim=c(0, 1e5), ylim=c(0, 1.1) )
 ```
 
 
-A very brief Dose Response Curve primer
+A brief Dose Response Curve primer
 ======================================
 
 A dose response curve models the response of an organism to varying
@@ -95,10 +95,10 @@ frequently takes a sigmoidal (S-shaped) shape. This curve can be modeled by
 fitting a non-linear model that has parameters for the upper and lower 
 asymptotes, the slope of the middle of the curve, and the point at which the 
 curve reaches the mid-way point between the upper and lower asymptotes. This 
-midway point has various names depending on the specific application, including 
-the $IC_{50}$, $EC_{50}$, or $LD_{50}$.
+midway point has various names with slightly different meanings, depending on 
+the specific application, including the $IC_{50}$, $EC_{50}$, or $LD_{50}$.
 
-The dose response curve for a drug effect *E* is defined by the equation:
+The dose response curve for a drug effect *E* can be defined by the equation:
 
 $E = \frac{ E_{max} ( \frac{D}{ IC_{50} })^m  } {1 + (\frac{D}{IC_{50}})^m}$
 
@@ -116,7 +116,7 @@ where *b* is the slope (*m*), *c* is $E_{min}$, *d* is $E_{max}$, and *e* is the
 $IC_{50}$.
 
 
-Fitting Dose Response Curves without plate information
+Fitting Dose Response Curves
 ================================================================================
 
 HTDoseResponseCurve can be used with multiple timepoints 
@@ -132,8 +132,8 @@ Specifying how to normalize data
 Data are first loaded and then optionally **normalized** against a negative control (also called a vehicle control). Many times it is desirable to reduce plate-specific or cell-line-specific effects by normalization of data against a control well that contains no perturbation other than the treatment vehicle. Normalization transforms each value into a percentage of the negative control. Normalized values greater than 1 are possible. You can specify the negative control in four ways: 
 
 1. No negative control wells exist, or the data are already normalized
-2. One or more wells are the shared negative control for all other treatments with that sample type on the plate. *Use case example*: All drugs on the plate share a common DMSO control plated in triplicate.
-3. For each treatment, there is one or more well with a (presumably zero) concentration of that treatment that should be considered a negative control. This case is appropriate if each treatment has its own vehicle-only wells, labeled with the name of that treatment. *Use case example*: The plate carries Olaparib and Rucaparib treatments, and each has a DMSO control plated in triplicate, labeled as "Olaparib concentration 0" or "Rucaparib concentration 0" respectively.
+2. One or more wells are the shared negative control for all other treatments with that sample type on the plate. *Use case example*: All drugs on the plate share a common DMSO control.
+3. For each treatment, there is one or more well with a (presumably zero) concentration of that treatment that should be considered a negative control. This case is appropriate if each treatment has its own no treatment wells, labeled with the name of that treatment. *Use case example*: The plate carries Olaparib and Rucaparib treatments, and each has a DMSO control, labeled as "Olaparib 0 nM" or "Rucaparib 0 nM" respectively.
 4. There are two or more *distinct* sets of shared negative control wells, with some treatments mapped to each. *Use case example*: the plate carries three drugs with a shared DMSO control, and one with an ethanol control.
 
 If you specify the existence of negative controls, *HTDoseResponseCurve* will expect to find them for all of the sample types and treatments on the plate.
@@ -154,10 +154,10 @@ values=c(100,99,100,90,91,92,99,97,99,89,87,88,
          86,89,88,56,59,58,66,65,67,25,23,24,42,43,46,4,5,9)
 
 ds = create_dataset( sample_types, 
-                       treatments, 
-                       concentrations, 
-                       values,
-                       negative_control = "DMSO")
+                     treatments, 
+                     concentrations, 
+                     values,
+                     negative_control = "DMSO")
 ```
 
 Loading Data from a text file
@@ -171,6 +171,8 @@ column headers in the first row:
 **treatment**  
 **concentration**  
 **value**  
+
+These headers may be in any order, and additional columns may be present.
 
 The following example experiment tested the effect of four concentrations of a 
 drug (200, 500, 1000, and 2000 nM) on the viabilitity of two cell lines, 
@@ -194,12 +196,60 @@ head(ds)
 
 If your text file has the optional column **hour**, data from this column will be loaded into the dataset.
 
-Choosing the model used for curve fitting
+
+
+Summarizing a Dose Response Curve
+--------------------------------------------------------------------------------
+
+The *fit_DRC()* function attempts to fit a dose response curve. The *fit_DRC()* function returns a *HT_fit* object. You can view essential information about the fit that was obtained using the R core function *summary()*:
+
+```{r summary}
+fit_1 = fit_DRC( ds, 
+                 sample_types=c("line1", "line2"), 
+                 treatments="drug", 
+                 fct=drc::LL.4() )
+summary( fit_1 )
+```
+
+The *summary()* function returns the coefficients estimated by the fit. If there is more than one unique condition in the fit, *summary()* reports the result of an ANOVA test comparing a model lacking parameters for treatment or sample type to a model with treatment/sample type as a covariate. The **F-statistic** and **p-value** values reported in the summary of *fit_1* are derived from the ANOVA. Extremely low *P* values may be rounded to zero by the *summary()* function.
+
+The summary also reports an estimated **Area Under the Curve (AUC)**, an estimated **$EC_{50}$** (Effective Concentration, an estimate of the concentration of treatment that reduces the measured value to halfway between the highest and lowest amounts), an estimated an estimated **$SF_{50}$** (Surviving Fraction, an estimate of the concentration of treatment that reduces the measured value to 50%), and the **fitted values at the lowest and highest concentrations** of drug. 
+
+If the data are not at all sigmoidal, the fit might not converge. This will be reported in the summary.
+
+
+Plotting a Dose Response Curve
+--------------------------------------------------------------------------------
+
+To plot a dose response curve, pass the *HT_fit* object generated by the *fit_DRC()* 
+function to the *plot()* function.
+
+```{r plot_simplest, fig.height=4, fig.width=4}
+fit_1 = fit_DRC( ds, fct=drc::LL.4() )
+plot( fit_1 )
+```
+
+Note that in this summary for line 1 in the previous section, the SF50 value for line 1 is 1919.97 while the EC50 value is 855.24. This curve, where line 1 is plotted in black, should make clear the distinction between the SF50 and EC50: the EC50 is the concentration required to lower the fitted value to the 50th percentile between the upper and lower asymptote, while the SF50 is the concentration required to lower the fitted value to 0.5, or 50%. Since the lowest value on the black curve is only slightly lower than 50%, its SF50 is much larger than its EC50.
+
+The *plot()* function understands the parameters for R's built-in *plot()* 
+function, so it is straightforward to alter its appearance:
+
+```{r plot_fit13, fig.height=4, fig.width=4}
+plot(fit_1,
+     xlim=c(0, 1e5),
+     main="Drug dose response curve", 
+     xlab="concentration nM",
+     ylab="surviving fraction", 
+     lwd=3, 
+     col=c("black", "cornflowerblue") )
+
+legend( 3, 0.4, c("Line 1", "Line 2"), col=c("black", "cornflowerblue"), pch=19)
+```
+
+Specifying which model coefficients to fit
 --------------------------------------------------------------------------
 
-Once the data have been loaded, it is straightforward to fit one or more dose response curves using the *fit_DRC()* function. Curves are fit using non-linear curve fitting performed the *drm()* function in the *drc* package, and plotted using a wrapper around  by the *drc.plot()* function also from *drc*.
-
-The *drm()* function in the *drc* package can fit the dose response data to a number of different functions. One way these functions vary is in which parameters are estimated from data, as opposed to setting the parameter to a constant value. Christian Ritz, Florent Baty, Jens C. Streibig, and Daniel Gerhard have published a very useful guide that provides a gentle introduction to this topic: **Dose-Response Analysis Using R** [Ritz PLoS ONE 2015](http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4696819). Reading this well-written tutorial is strongly recommended for anyone who will use either the *drc* or the *HTDoseResponseCurve* package.
+The *fit_DRC()* function fits and plots curves using non-linear curve fitting methods exposed by functions in the *drc* package. It is important to understand that this model has several coefficients, and it is possible to set some of these coefficients to fixed values rather than estimating them from the data. Estimating values is neither always correct nor always wrong; it requires judgement to decide how to fit the curve. Christian Ritz, Florent Baty, Jens C. Streibig, and Daniel Gerhard have published a very useful guide that provides a gentle introduction to this topic: **Dose-Response Analysis Using R** [Ritz PLoS ONE 2015](http://www.ncbi.nlm.nih.gov/pmc/articles/PMC4696819). Reading that well-written tutorial is strongly recommended for anyone who will use either the *drc* or the *HTDoseResponseCurve* package.
 
 As a reminder, the four parameter model is:  
 
@@ -208,7 +258,9 @@ $E = c + \frac{d-c}{1+\exp(b(\log(x)-\log(e)))}$
 where *b* is the slope (*m*), *c* is $E_{min}$, *d* is $E_{max}$, and *e* is the 
 $IC_{50}$.
 
-To estimate the **dose response slope**, **upper asymptote**, **lower asymptote**, and **$EC_{50}$**, pass *drc::LL.4()* to the *fct* parameter of *fit_DRC()*. To fix the lower asymptote to zero, pass *drc::LL.3()* into *fit_DRC()*. If you wish to display the $EC_{50}$ estimates on the curve with dotted vertical lines, pass *show_EC50=TRUE*. The $EC_{50}$ concentrations may be different from the 50% surviving Fraction concentration ($SF_{50}$) if the lower asymptote is not zero.
+To estimate the **dose response slope**, **upper asymptote**, **lower asymptote**, and **$EC_{50}$**, pass *drc::LL.4()* to the *fct* parameter of *fit_DRC()*. To fix the lower asymptote to zero, pass *drc::LL.3()* into *fit_DRC()*. To fix the lower and upper asymptotes to zero and 1 respectively, pass *drc::LL.2()*.
+
+If you wish to display the $EC_{50}$ estimates on the curve with dotted vertical lines, pass *show_EC50=TRUE*. The $EC_{50}$ concentrations may be different from the 50% surviving Fraction concentration ($SF_{50}$) if the lower asymptote is not zero.
 
 ```{r different_estimators, fig.height=4, fig.width=8}
 # estimate EC50, slope, upper asymptote, lower asymptote
@@ -224,60 +276,13 @@ fit_1_lower0 = fit_DRC(ds,
                 fct=LL.3())
 
 # estimate EC50, slope. Upper, lower asymptotes set to 1, 0.
-fit_1_both0 = fit_DRC(ds, 
+fit_1_both = fit_DRC(ds, 
                 sample_types = c("line1", "line2"), 
                 treatments = "drug",
                 fct=LL.2())
 ```
 
-The *fit_DRC()* function will sometimes report warnings or errors generated by the *drc::drm()* function during curve fitting. Errors indicate that the model was not able to converge to a fit. This can occur if the data do not have a remotely sigmoidal shape.
-
-Summarizing a Dose Response Curve
---------------------------------------------------------------------------------
-
-The *fit_DRC()* function returns a HT_fit object. This object can be summarized using the R core function *summary()*:
-
-```{r summary}
-summary( fit_1 )
-```
-
-The *summary()* function returns the coefficients estimated by the fit. If there is more than one unique condition in the fit, *summary()* reports the result of an ANOVA test comparing a model lacking parameters for treatment or sample type to a model with treatment/sample type as a covariate. The **F-statistic** and **p-value** values reported in the summary of *fit_1* are derived from the ANOVA. Extremely low *P* values may be rounded to zero by the *summary()* function.
-
-```{r pval}
-plot(fit_1, xlim=c(0, 1e5))
-```
-
-The summary also reports an estimated **Area Under the Curve (AUC)**, an estimated **$EC_{50}$** (Effective Concentration, an estimate of the concentration of treatment that reduces the measured value to halfway between the highest and lowest amounts), and the **fitted values at the lowest and highest concentrations** of drug. 
-
-If the data are not at all sigmoidal, the fit might not converge. This will be reported in the summary.
-
-
-Plotting a Dose Response Curve
---------------------------------------------------------------------------------
-
-To plot a dose response curve, pass the object generated by the *fit_DRC()* 
-function to the *plot()* function.
-
-```{r plot_simplest, fig.height=4, fig.width=4}
-plot( fit_1 )
-```
-
-The *plot()* function understands the parameters for R's built-in *plot()* 
-function, so it is straightforward to alter its appearance:
-
-```{r plot_fit13, fig.height=4, fig.width=4}
-plot(fit_1,
-     show_legend = FALSE, 
-     xlim=c(0, 1e5),
-     main="Drug dose response curve", 
-     xlab="concentration nM",
-     ylab="surviving fraction", 
-     lwd=3, 
-     col=c("black", "cornflowerblue") )
-
-legend( 3, 0.4, c("Line 1", "Line 2"), col=c("black", "cornflowerblue"), pch=19)
-```
-
+The *fit_DRC()* function will sometimes report warnings or errors generated by the *drc::drm()* function during curve fitting. Errors indicate that the model was not able to converge to a fit. This can occur if the data do not have a sufficiently sigmoidal shape.
 
 We can plot curves fitted with the *drc* functions *LL.4()*, *LL.3()*, and 
 *LL.2()* to see the results of different choices for which parameters to 
@@ -288,10 +293,22 @@ layout(matrix(1:3,1,3))
 par(mar=c(3,3,3,1))
 plot( fit_1, main="LL.4()", xlim=c(0, 1e6), show_EC50=TRUE )
 plot( fit_1_lower0, main="LL.3(), lower=0", xlim=c(0, 1e6), show_EC50=TRUE )
-plot( fit_1_both0, main="LL.2(), upper=1, lower=0", xlim=c(0, 1e6), show_EC50=TRUE )
+plot( fit_1_both, main="LL.2(), upper=1, lower=0", xlim=c(0, 1e6), show_EC50=TRUE )
 ```
 
-Note that in the *LL.3()* and *LL.2()* calls, the curves asymptotically approach zero because we specified that the lower asympotote should be zero. The two plots have markedly different $EC_{50}$ estimates from *LL.4()* on the left because the $EC_{50}$ is measured relative to the upper and lower asymptotes for the curve, and the curves have different lower asymptotes.
+Note that in the *LL.3()* and *LL.2()* calls, the curves asymptotically approach zero because we specified that the lower asympotote should be zero. Theose two plots have higher $EC_{50}$ estimates than *LL.4()* on the left, because the $EC_{50}$ is measured relative to the upper and lower asymptotes for the curve, and the curves have different lower asymptotes.
+
+We can emphasize the difference between the EC50 and SF50 for this curve fitting by plotting both values for the same curve:
+
+```{r plot_SF50, fig.height=4, fig.width=8}
+layout(matrix(1:3,1,3))
+par(mar=c(3,3,3,1))
+plot( fit_1, main="LL.4(), SF50", xlim=c(0, 1e6), show_SF50=TRUE )
+plot( fit_1, main="LL.4(), EC50", xlim=c(0, 1e6), show_EC50=TRUE )
+```
+
+Note that drug one (black line) reaches its EC50 at a lower concentration than 
+its SF50.
 
 You can fit and plot more than one treatment or sample type if there are multiple values in your data set by passing them to the *treatments* or *sample_type* parameters as a vector.
 
@@ -299,7 +316,7 @@ You can fit and plot more than one treatment or sample type if there are multipl
 ********************************************************************************
 
 
-Loading data from multiwell plates
+Loading data from multi-well plates
 ================================================================================
 
 
@@ -370,16 +387,9 @@ Combine the plate map and the raw data
 
 So far we have separately specified measurement values (in the *plate* variable) and metadata values (in the *plate_map* variable). It is common to re-use the same plate map information for data from many timepoints. To analyze the data we will combine the measurements and metadata into a single dataset. 
 
-When combining the plate map and raw data, you must specify **which wells (if any) correspond to negative controls**, also known as vehicle-treated wells. As noted above, there are four possibilities:
+When combining the plate map and raw data, you must specify **which wells (if any) correspond to negative controls**, also known as vehicle-treated wells. Negative controls are described above in the section **Specifying how to normalize data**; please review that section if you skipped it.
 
-1. No negative control wells exist. 
-2. A set of one or more duplicate wells are the shared negative control for all other treatments with that sample type on the plate. *Use case example*: All drugs on the plate share a common DMSO control plated in triplicate.
-3. For each treatment there is one or more well with a (presumably zero) concentration of that treatment that should be considered a negative control. This case is appropriate if each treatment has its own vehicle-only wells, labeled with the name of that treatment. *Use case example*: The plate carries Olaparib and Rucaparib treatments, and each has a DMSO control plated in triplicate, labeled as "Olaparib concentration 0" or "Rucaparib concentration 0" respectively.
-4. There are two or more *distinct* sets of shared negative control wells, with some treatments mapped to each. *Use case example*: the plate carries three drugs with a shared DMSO control, and one with an ethanol control.
-
-If you specify the existence of negative controls, *HTDoseResponseCurve* will expect to find them for all of the sample types and treatments on the plate.
-
-In this example, there are `r sum(plate_map$treatment=="DMSO")` negative control wells with the treatment label "DMSO", corresponding to case 2.
+In this example, there are `r sum(plate_map$treatment=="DMSO")` negative control wells with the treatment label "DMSO".
 
 ```{r combine}
 ds = combine_data_and_map( plate_1, plate_map, negative_control = "DMSO" )
@@ -393,6 +403,8 @@ We can extract sample types or treatments from the dataset object using *get_sam
 get_sample_types(ds)
 get_treatments(ds)
 ```
+
+The dataset object returned by combine_data_and_map is the same regardless of whether it was created by the *combine_data_and_map()* function or by a call to *create_dataset()* as described in the previous section.
 
 Quick Start: Loading data generated by the Incucyte system
 ================================================================================
@@ -445,6 +457,7 @@ plot_values_by_plate(plate = plate_data, hour = 228, main="228 hours")
 ```
 
 
+
 Plotting Dose Response Curves
 -------------------
 
@@ -453,7 +466,7 @@ As we saw above, you can easily fit dose response curves from these data.
 **IMPORTANT**: since this dataset contains multiple timepoints, you have to 
 specify the hour to plot:
 
-```{r fit_drc_inc, fig.height=4, fig.width=4}
+```{r fit_drc_inc, fig.height=4, fig.width=4, warning=FALSE}
 fit_inc = fit_DRC( ds, 
                    sample_types=c("line_1","line_2"), 
                    treatments = "drug13", 
@@ -507,24 +520,24 @@ The dose response curve for Line 1 is drawn with closed points, while line 2
 is drawn with open squares. Line 1 (L1) grows faster than L2, and that at 180 
 hours, the DMSO-treated wells have become confluent. 
 
-To examine un-normalized single drug response across two cell lines, we can 
-look at the raw confluence score at these timepoints.
+To examine un-normalized values for wells treated with a particular drug across the  two cell lines, we can look at the raw confluence score at these timepoints.
 
 ```{r plot_over, fig.height=4, fig.width=7, warning=FALSE}
 x=plot_timecourse( 
     ds, 
     sample_types=c("line_1","line_2"),
-    treatments="drug13", 
-    concentrations=c(200,1000,5000), 
+    treatments=c("DMSO","drug13"), 
+    concentrations=c(0,5000), 
     main=paste("Drug 13"), 
     ylab="Confluence",
     ylim=c(0,100) )
-legend(0, 100, c("L1 200", "L1 1000", "L1 5000", "L2 200", "L2 1000", "L2 5000"),
-       pch=c(19,19,19,22,22,22), 
-       col=c("black", "red", "cornflowerblue","black", "red", "cornflowerblue") )
+
+legend(0, 100, c("L1 DMSO", "L1 5000 nM", "L2 DMSO","L2 5000 nM"),
+       pch=c(19,19,22,22), 
+       col=c("black", "red","black",  "red") )
 ```
 
-For the raw (un-normalized) drug treatment data, the low confluence of open blue squares (L2 5000, meaning 5000 nM of drug on line 2) compared to blue dots (5000 nM line 1) reflects the selective efficacy of this drug on line 2 cells at the 5uM dose. 
+Here we can directly examine the un-normalized vehicle treated samples (black) and 5000 nM samples (red). Drug 13 only modestly affects cell line L1 but has a dramatic impact on cell line L2.
 
 
 Dose response curves at many timepoints at once
@@ -541,7 +554,7 @@ for(h in 1:4){
                    sample_types=c("line_1","line_2"), 
                    treatments = "drug13", 
                    hour=hours_to_plot[h], fct=drc::LL.3() ), 
-          xlim=c(0, 1e5),
+          xlim=c(0, 1e6),
           lwd=3, 
           main=paste("Drug 13:", hours_to_plot[h], "hours"), 
           ylab="surviving fraction", 
@@ -966,44 +979,55 @@ ${Effect}_{null} = {Effect}_A + {Effect}_B - ({Effect}_A \times {Effect}_B)$
 This result is sometimes called the "excess over Bliss independence".
 
 In this example, two drugs are tested at four concentrations (including 0 nM, 
-the vehicle condition). Heat maps plotted using the *plot_color_grid()* function 
-show the excess over Bliss independence.
+the vehicle condition). In one reality the dataset (DS_add), they have merely 
+additive effects when combined. In an alternate reality (DS_syn), they have 
+evidence for synergistic interactions when combined. The Excess over Bliss 
+score is plotted as a heat map using the *plot_color_grid()* function.
 
 ```{r fig.height=5, fig.width=9}
-samples = rep("s1", 16)
-t1 = rep( c("DMSO", "d1", "d1", "d1"), 4)
-t2 = c( rep( "DMSO", 4), rep("d2", 12) )
+
+samples = rep("cell_line_1", 16)
+t1 = rep( c("DMSO", "drug1", "drug1", "drug1"), 4)
+t2 = c( rep( "DMSO", 4), rep("drug2", 12) )
 c1 = rep( c(0, 50, 100, 200), 4)
 c2 = c(0,0,0,0, 50,50,50,50, 100,100,100,100, 200,200,200,200)
 value_ind=c(1,0.8,0.7,0.6,0.8,0.7,0.6,0.5,0.7,0.6,0.5,0.4,0.6,0.5,0.4,0.3)
 value_syn=c(1,0.8,0.7,0.6,0.8,0.8,0.5,0.3,0.7,0.3,0.2,0.1,0.6,0.3,0.1,0.05)
 
-DS_i=create_synergy_dataset( sample_types=samples, treatments_1=t1,
+DS_add=create_synergy_dataset( sample_types=samples, treatments_1=t1,
                          treatments_2=t2, concentrations=c1, 
                          concentrations_2=c2, values=value_ind, 
                          negative_control="DMSO")
-DS_s=create_synergy_dataset( sample_types=samples, treatments_1=t1,
+DS_syn=create_synergy_dataset( sample_types=samples, treatments_1=t1,
                          treatments_2=t2, concentrations=c1, 
                          concentrations_2=c2, values=value_syn, 
                          negative_control="DMSO")
 
-b_ind = synergy_bliss(DS_i, "d1", "d2")
-b_syn = synergy_bliss(DS_s, "d1", "d2")
+b_add = synergy_bliss(DS_add, "drug1", "drug2")
+b_syn = synergy_bliss(DS_syn, "drug1", "drug2")
 layout(matrix(1:2,1,2))
-gi = plot_color_grid(b_ind$excess, color_bounds = c(-1,1), 
-                main="additive", xlab="nM drug 1", ylab="nM drug 2")
+par(mar=c(4,4,3,1))
+gi = plot_color_grid(b_add$excess, color_bounds = c(-1,1), 
+                main="additive", xlab="nM drug 1", ylab="nM drug 2", 
+                plot_values = TRUE)
 gs = plot_color_grid(b_syn$excess, color_bounds = c(-1,1), 
-                main="synergistic", xlab="nM drug 1", ylab="nM drug 2")
+                main="synergistic", xlab="nM drug 1", ylab="nM drug 2", 
+                plot_values = TRUE)
 ```
 
-We can look at the raw values directly:
+To view excess over bliss synergy more clearly, it may be helpful to hold one drug constant and plot the effect of increasing the concentration of the second drug. Here we hold drug "drug2" constant at either 50, 100, or 200 nM and show individual dose responses as "drug1" is varied. The evidence for synergy is represented by the distance between the combined effect (solid circle) vs. the expected effects of the individual drugs by themselves.
 
-```{r}
-b_syn
-```
-
-
-```{r}
-library(plot3D)
-3
+```{r echo=FALSE, fig.height=9, fig.width=7}
+layout(matrix(1:3,3,1))
+par(mar=c(4,4,3,1))
+concs=c(50, 100, 200)
+for( i in 1:3 ){
+    plot_additive_vs_synergy_effect( DS_syn, 
+            treatment_for_DRC="drug1", concs_for_DRC=c(50, 100, 200), 
+            treatment_subgroup="drug2", conc_subgroup=concs[i], 
+            hour=0, sample_type="cell_line_1", 
+            cex=2, xlab=paste("drug1 effect when drug2=",concs[i],"nM", sep=""))
+    legend( 1, 0.95, c("drug1", "drug2", "both"), pch=c(1, 2, 19), bty="n", cex=1.5 )
+    box()
+}
 ```
