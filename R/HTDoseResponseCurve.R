@@ -146,6 +146,7 @@ AUC.HT_fit = function(FIT, granularity=0.01, summary_method="mean"){
     coef_c = rep(NA, length(FIT$unique_conditions))
     coef_d = rep(NA, length(FIT$unique_conditions))
     coef_e = rep(NA, length(FIT$unique_conditions))
+    SF50 = rep(NA, length(FIT$unique_conditions))
     auc = rep(NA, length(FIT$unique_conditions))
     
     # Summarize
@@ -178,10 +179,7 @@ AUC.HT_fit = function(FIT, granularity=0.01, summary_method="mean"){
             auc[i] = pracma::trapz(10^(Mcur$concentration), Mcur$value)
         }
     }else{
-        # TESTING
-        #max_concentration = log10( max(FIT$input$concentration) )
-        #conc_to_fit= 10^seq(from=0, to=max_concentration, by=granularity )
-        max_concentration = max(FIT$input$concentration) 
+        max_concentration = max(FIT$input$concentration, na.rm=TRUE) 
         conc_to_fit= seq(from=0, to=max_concentration, by=granularity )
         
         conc_test = rep(conc_to_fit, length(FIT$unique_conditions) )
@@ -196,10 +194,16 @@ AUC.HT_fit = function(FIT, granularity=0.01, summary_method="mean"){
         preds = try( stats::predict(FIT$model, model_input_test), silent=TRUE )
         
         if( !"try-error" %in% class( preds ) ){
+            model_input_test$ys=preds
             for( i in 1:length(FIT$unique_conditions) ){
                 cur_cond=FIT$unique_conditions[i]
-                observed = FIT$input$value[ FIT$input$conditions_to_fit==
-                                                cur_cond ]
+                
+                idxs=which( model_input_test$ys<0.5 & 
+                            model_input_test$conditions_to_fit==cur_cond)
+                if( length(idxs)>0 ){
+                    idx_50 = min( idxs )
+                    SF50[i]=model_input_test$concentration[ idx_50 ]
+                }
                 idx_first = min( which(cond_test==cur_cond ) )
                 idx_last =  max( which(cond_test==cur_cond ) )
                 ys = preds[ idx_first : idx_last ]
@@ -239,9 +243,8 @@ AUC.HT_fit = function(FIT, granularity=0.01, summary_method="mean"){
                     coef_e[i] = as.numeric(stats::coefficients(FIT$model)[idx_e])
                 }
                 auc[i] = pracma::trapz(conc_to_fit, ys) / max_concentration
-                if( min( observed, na.rm=TRUE) > 0.5 ){
-                    coef_e[i] = Inf
-                }
+                observed = FIT$input$value[ FIT$input$conditions_to_fit==
+                                                cur_cond ]
             }
         }
     }
@@ -253,6 +256,7 @@ AUC.HT_fit = function(FIT, granularity=0.01, summary_method="mean"){
                                 coef_EC50 = round( coef_e, 3),
                                 obs_min = round( obs_min, 3), 
                                 obs_max = round( obs_max, 3 ), 
+                                SF50 = round( SF50, 3 ),
                                 row.names = FIT$unique_conditions )
     FIT
 }
@@ -468,13 +472,19 @@ get_hours = function( D ){
 # helper function to normalize data in D relative to vehicle
 prepare_for_normalization = function( D, negative_control ){
     
-    # is_neg_ctl is required for the case where a drug at concentration 0 is 
-    # its own negative control; we need a way to remember which of the wells 
-    # to summarize for the negative control
+    # neg_ctl and neg_ctl_2 are strings that contain the name of the treatment
+    # that provided a negative control. This could be DMSO, Vehicle, or the 
+    # name of the drug treatment if we identify negative controls by 
+    # concentration rather than by treatment name.
+    # is_neg_ctl and is_neg_ctl_2 are TRUE if that well is negative control 
+    # for treatment 1 or treatment 2 respectively. A well can have zero, 
+    # one, or both of these variables set to TRUE.
+    # for synergy experiments, need to normalize only against wells where
+    # both is_neg_ctl == is_neg_ctl_2 == TRUE 
+    neg_ctl = rep( NA, dim(D)[1] )
+    neg_ctl_2 = rep( NA, dim(D)[1] )
     is_neg_ctl = rep( FALSE, dim(D)[1] )
-    neg_ctl = rep(NA, dim(D)[1] )
     is_neg_ctl_2 = rep( FALSE, dim(D)[1] )
-    neg_ctl_2 = rep(NA, dim(D)[1] )
     
     is_synergy = "treatment_2" %in% names(D)
     
@@ -505,8 +515,8 @@ prepare_for_normalization = function( D, negative_control ){
                                  negative_control )
                 if( length( idx ) == 0 ){
                     stop(paste("negative_control parameter passed with value",
-                               negative_control,"so we assume each",
-                               "treatment has one or more wells with concentration",
+                               negative_control,". Each treatment should have",
+                               "one or more wells with concentration",
                                "=",negative_control, "which is not the case for", 
                                treatments[i] ) )
                 }
@@ -515,28 +525,21 @@ prepare_for_normalization = function( D, negative_control ){
                 neg_ctl_2[ D$treatment_2==treatments[i] ] = treatments[i]
             } 
         }
-        
-    }else if( is.character(negative_control) ){
+    }else if( is.character( negative_control ) ){
         if( length( intersect( negative_control, 
                                c(D$treatment, D$treatment_2)) ) != 1 ){
             stop(paste("negative_control", negative_control,
                        "is not among the treatments on this plate"))
         }
-        
+        neg_ctl = rep( negative_control, dim(D)[1])
+        is_neg_ctl = !is.na(D$treatment) & D$treatment==negative_control
+        sum_of_neg_ctl = sum(is_neg_ctl)
         if( is_synergy ){
-            neg_ctl = rep( negative_control, dim(D)[1])
             neg_ctl_2 = rep( negative_control, dim(D)[1])
-            #is_neg_ctl = !is.na(D$treatment) & !is.na(D$treatment_2) & 
-            #             D$treatment==negative_control & 
-            #             D$treatment_2==negative_control
-            #is_neg_ctl_2 = is_neg_ctl
-            is_neg_ctl = !is.na(D$treatment) & D$treatment==negative_control 
             is_neg_ctl_2 = !is.na(D$treatment_2)&D$treatment_2==negative_control
-        }else{
-            neg_ctl = rep( negative_control, dim(D)[1])
-            is_neg_ctl = !is.na(D$treatment) & D$treatment==negative_control
+            sum_of_neg_ctl = sum_of_neg_ctl + sum(is_neg_ctl_2)
         }
-        if( sum(is_neg_ctl)==0 ) {
+        if( sum_of_neg_ctl==0 ) {
             warning(paste("negative control",negative_control,"was specified", 
                           "but no wells were marked as untreated when",
                           "including both treatment and treatment_2 columns"))   
@@ -584,7 +587,7 @@ prepare_for_normalization = function( D, negative_control ){
             }
             if( sum(is.na(neg_ctl_2))>0 ){
                 stop(paste( "Not all drugs have been assigned a",
-                            "negative control, check negative_control parameter"))
+                          "negative control, check negative_control parameter"))
             }
             if( length( setdiff(neg_ctl, D$treatment)>0 ) ){
                 stop( paste( "parameter negative_control contain an element in",
@@ -607,11 +610,12 @@ normalize_by_vehicle = function( D, summary_method ){
     if( summary_method != "mean" & summary_method != "median"){
         stop("summary_method parameter must be either mean or median")
     }
-    
-    D$value_normalized = D$value
-    plates = sort(unique(D$plate_id))
     is_synergy = "treatment_2" %in% names(D)
     
+    D$value_normalized = D$value
+    
+    # normalization broken out by each timepoint (D$hours) on each plate 
+    plates = sort(unique(D$plate_id))
     for( pp in 1:length(plates)){
         plate_cur = plates[pp]
         hours = unique( D$hours[ D$plate_id == plate_cur ] ) 
@@ -699,7 +703,7 @@ normalize_by_vehicle = function( D, summary_method ){
 #' Defaults to NULL, meaning only a single treatment per well.
 #' @param concentrations_2 vector of second concentrations, used for synergy 
 #' datasets. Defaults to NULL, meaning only a single treatment per well.
-#' #' @param summary_method Method used to combine replicate measures into a single 
+#' @param summary_method Method used to combine replicate measures into a single 
 #' value; must be one of "mean", "median". Defaults to "mean".
 #' @return A data frame where columns indicate the sample type, treatment, 
 #' concentration, observed raw value, normalized value,
@@ -955,6 +959,8 @@ create_synergy_dataset = function( sample_types, treatments_1, treatments_2,
 #' }
 #' @param summary_method summarize replicate measures by either mean or median; 
 #' must be one of "mean", "median". Defaults to "mean"
+#' @param na.rm remove from final dataset rows where sample_type, treatment, 
+#' or concentration has the value NA. Default TRUE.
 #' @return A data frame where columns indicate the sample type, treatment, 
 #' concentration, observed raw value, normalized value, name of the 
 #' negative_control treatment, whether a particular row 
@@ -988,7 +994,8 @@ create_synergy_dataset = function( sample_types, treatments_1, treatments_2,
 combine_data_and_map = function( raw_plate, 
                                  plate_map, 
                                  negative_control=0, 
-                                 summary_method="mean" ){
+                                 summary_method="mean", 
+                                 na.rm=TRUE){
     
     COLS = dim(plate_map$concentration)[2]
     ROWS = dim(plate_map$concentration)[1]
@@ -1103,7 +1110,12 @@ combine_data_and_map = function( raw_plate,
               stringsAsFactors=FALSE )
     }
     D = prepare_for_normalization( D, negative_control )
-    normalize_by_vehicle(D, summary_method=summary_method )
+    D = normalize_by_vehicle( D, summary_method=summary_method )
+    if( na.rm ){
+        keep = !is.na( D$sample_type ) & !is.na( D$treatment ) & !is.na( D$concentration )
+        D = D[keep,]
+    }
+    D
 }
 
     
@@ -1278,7 +1290,7 @@ fit_DRC = function(D, fct, sample_types=NA, treatments=NA, hour=NA,
     
     # set treatments to all values if user passed NA
     if( is.na(treatments[1]) ){
-        treatments = sort(unique(D$treatment))
+        treatments = sort(unique(D$treatment[!D$is_negative_control]))
     }
     
     # set treatment_columns to treatment if user passed NA
@@ -1300,11 +1312,11 @@ fit_DRC = function(D, fct, sample_types=NA, treatments=NA, hour=NA,
     # check treatments; treatment_columns will have same length by now
     for(i in 1:length(treatments)){
         if( treatment_columns[i]=="treatment_2" ){
-            if( sum(D$treatment_2==treatments[i])==0 ) 
+            if( sum(D$treatment_2==treatments[i], na.rm=TRUE)==0 ) 
                 stop(paste("value in treatments parameter", treatments[i],
                            "not present in D in column treatments_2"))
         }else{
-            if( sum(D$treatment==treatments[i])==0 ) 
+            if( sum(D$treatment==treatments[i], na.rm=TRUE)==0 ) 
                 stop(paste("value in treatments parameter", treatments[i],
                            "not present in D in column treatments"))   
         }
@@ -1345,17 +1357,16 @@ fit_DRC = function(D, fct, sample_types=NA, treatments=NA, hour=NA,
         stop("Model fit requires at least two distinct concentrations")
     }
     model_input$conditions_to_fit = factor(model_input$conditions_to_fit)
+    conditions_to_fit = model_input$conditions_to_fit
     if( length( unique( model_input$conditions_to_fit ) ) == 1 ){
         FIT$model = try( drc::drm( value~concentration, 
-                                   model_input$conditions_to_fit, 
+#                                   conditions_to_fit,
                                    data=model_input, 
                                    fct = fct) )
     }
     else{
         FIT$model = try( 
-            drc::drm( value~concentration, 
-                      model_input$conditions_to_fit, 
-                      data=model_input, 
+            drc::drm( value~concentration, conditions_to_fit, data=model_input, 
                       fct = fct), 
             silent=TRUE )
     }
@@ -1401,7 +1412,7 @@ fit_DRC = function(D, fct, sample_types=NA, treatments=NA, hour=NA,
 #' \code{drc::getMeanFunctions()}. 
 #' 
 #' To call this function you must load the drc package in your R session.
-#' @param D experiment dataset with columns matching the output of 
+#' @param ds experiment dataset with columns matching the output of 
 #' \code{combine_data_and_map}
 #' @param fct Non-linear function to fit, e.g. drc::LL.3(). See summary. 
 #' @param sample_type Which sample type (e.g. distinct cell line) of the 
@@ -1544,11 +1555,23 @@ fit_statistics = function(D, fct){
         hours = get_hours(D[D$treatment==cur_treat,])
         for(hh in 1:length(hours) ){
             cur_hour = hours[hh]
-            FIT=fit_DRC(D, sample_types, cur_treat, cur_hour, fct=fct)
-            rn=rownames(FIT$fit_stats)
-            treatment = get.split.col(rn, "_|_", last=TRUE)
-            sample_type = get.split.col(rn, "_|_", first=TRUE)
-            summ = cbind( is_fitted = rep(FIT$is_fitted, length(treatment)),
+            # protect against situation where a given treatment-hour combination
+            # is not present, e.g. a time point where sample "foo" had a missed
+            # scan but sample "bar" was present. Otherwise fit_DRC throws error
+            st_valid_comparison = c()
+            for(ss in 1:length(sample_types)){
+                if( sum( D$sample_type==sample_types[ss] &
+                         D$hours==hours[hh] &
+                         D$treatment==treatments[tt]) >0 ){
+                    st_valid_comparison = c( st_valid_comparison, sample_types[ss])
+                }
+            }
+            if( length(st_valid_comparison)>0 ){
+                FIT=fit_DRC(D, st_valid_comparison, cur_treat, cur_hour, fct=fct)
+                rn=rownames(FIT$fit_stats)
+                treatment = get.split.col(rn, "_|_", last=TRUE)
+                sample_type = get.split.col(rn, "_|_", first=TRUE)
+                summ = cbind( is_fitted = rep(FIT$is_fitted, length(treatment)),
                           hour = rep(cur_hour, length(treatment)),
                           treatment, 
                           sample_type, 
@@ -1556,10 +1579,11 @@ fit_statistics = function(D, fct){
                         ANOVA_F_test = rep(FIT$ANOVA_F_test, length(treatment)),
                         ANOVA_P_value=rep(FIT$ANOVA_P_value, length(treatment)),
                           stringsAsFactors=FALSE)
-            if(is.null(dim(res)) ){
-                res = summ
-            }else{
-                res = rbind(res, summ)
+                if(is.null(dim(res)) ){
+                    res = summ
+                }else{
+                    res = rbind(res, summ)
+                }
             }
         }
     }
@@ -1841,32 +1865,34 @@ timecourse_AUC_ratio = function( D, treatments, sample_types, concentrations,
     if( length(sample_types) != 2 ){
         stop("Must pass exactly two sample types in parameter sample_types")
     }
-    if( sum(D$sample_type==sample_types[1]) == 0  ){
+    if( sum(D$sample_type==sample_types[1], na.rm=TRUE) == 0  ){
         stop(paste("sample_types[1], '",sample_types[1], 
                    "', not found in D",sep="" ) )
     }
-    if( sum(D$sample_type==sample_types[2]) == 0  ){
+    if( sum(D$sample_type==sample_types[2], na.rm=TRUE) == 0  ){
         stop(paste("sample_types[2], '",sample_types[2], 
                    "', not found in D",sep="" ) )
     }
     for(i in 1:length(treatments)){
-        if(sum(D$sample_type==sample_types[1] & D$treatment==treatments[i])==0){
+        if(sum(D$sample_type==sample_types[1] & D$treatment==treatments[i], 
+               na.rm=TRUE)==0){
             stop(paste("treatment",treatments[i],"not found for sample type",
                        sample_types[1]))
         }
-        if(sum(D$sample_type==sample_types[2] & D$treatment==treatments[i])==0){
+        if(sum(D$sample_type==sample_types[2] & D$treatment==treatments[i], 
+               na.rm=TRUE)==0){
             stop(paste("treatment",treatments[i],"not found for sample type",
                        sample_types[2]))
         }
     }
     for(i in 1:length(concentrations)){
         if(sum(D$sample_type==sample_types[1] & 
-               D$concentration==concentrations[i])==0){
+               D$concentration==concentrations[i], na.rm=TRUE)==0){
             stop(paste("concentration",concentrations[i],
                        "not found for sample type", sample_types[1]))
         }
         if(sum(D$sample_type==sample_types[2] & 
-               D$concentration==concentrations[i])==0){
+               D$concentration==concentrations[i], na.rm=TRUE)==0){
             stop(paste("concentration",concentrations[i],
                        "not found for sample type",sample_types[2]))
         }
@@ -1902,7 +1928,7 @@ timecourse_AUC_ratio = function( D, treatments, sample_types, concentrations,
                 col_identities[ctr] = paste("AUC_", cur_s, collapse="", sep="")
                 col_sample_types[ctr] = cur_s
                 if( sum( D$sample_type==cur_s & D$concentration==cur_c & 
-                         D$treatment==cur_t)==0 ){
+                         D$treatment==cur_t, na.rm=TRUE)==0 ){
                     ratio=NA
                 }
                 else{
@@ -1937,3 +1963,4 @@ timecourse_AUC_ratio = function( D, treatments, sample_types, concentrations,
           concentrations=col_concentrations,
           sample_types=col_sample_types)
 }
+
