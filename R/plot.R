@@ -267,10 +267,26 @@ plot.HT_fit = function( x, ..., bar_multiple=2,
         bandwidth_factor=10
         x_legend=10
     }else{
-        Mstat$concentration=log10(Mstat$concentration)
+        Mstat$concentration = log10( Mstat$concentration )
         Mstat$concentration[is.infinite( Mstat$concentration)] = 0
-        plot_parameters[["x"]] = -1
-        do.call( graphics::plot, plot_parameters)
+        conditions = unique(Mstat$conditions_to_fit)
+        unfit = unique(Mstat[,c("conditions_to_fit", "concentration","value")])
+        xlim_transformed=log10( plot_parameters[["xlim"]] )
+        xlim_transformed[is.infinite(xlim_transformed)] = 0
+        plot( Mstat$concentration[Mstat$conditions_to_fit==conditions[1]], 
+              Mstat$value[Mstat$conditions_to_fit==conditions[1]],
+              axes=FALSE, 
+              xlim=xlim_transformed,
+              ylim=plot_parameters[["ylim"]],
+              pch=plot_parameters[["pch"]][1],
+              col=plot_parameters[["col"]][1],
+              xlab=plot_parameters[["xlab"]],
+              ylab=plot_parameters[["ylab"]],
+              main=plot_parameters[["main"]],
+              yaxs = "i",
+              xaxs= "i")
+        #plot_parameters[["x"]] = -1
+        #do.call( graphics::plot, plot_parameters)
         Mstat$bar_width = 0.2
         bandwidth_factor=50
         x_legend=0.2
@@ -287,6 +303,8 @@ plot.HT_fit = function( x, ..., bar_multiple=2,
                 log10_low=0
             tics = logtics( log10_low, log10_high,
                             show_x_log_tics, show_x_exponent)
+            if( !x$is_fitted)
+                tics$values = log10(tics$values)
             graphics::axis(1, at=tics$values, labels=tics$labels, las=1, 
                  font=plot_parameters[["font"]],
                  cex.axis=plot_parameters[["cex.axis"]], lwd.ticks=1)   
@@ -485,7 +503,12 @@ plot_values_by_plate = function( plate, hour=NA, color_bounds=c(0,100),
 #' @param plot_raw plot un-normalized raw values, defaults TRUE. If FALSE, 
 #' plots value_normalized.
 #' @param show_raw_vehicle If TRUE and plot_raw is TRUE, plot un-normalized 
-#' raw vehicle values. Defaults FALSE. 
+#' raw vehicle values. Defaults to FALSE. 
+#' @param combine_raw_plates if TRUE, allow raw timecourse plots that include 
+#' more than one plate. Normally combining more than one plate in a raw 
+#' timecourse plot produces unexpected plot behavior because of plate-specific 
+#' growth differences; that is not allowed unless combine_raw_plates is passed 
+#' to specify that you know what you're doing. Defaults to FALSE.
 #' @param ... standard parameters for \code{plot} function
 #' @param cex.xaxis size coefficient for X axis, default 1
 #' @param cex.yaxis size coefficient for Y axis, default 2
@@ -509,6 +532,7 @@ plot_values_by_plate = function( plate, hour=NA, color_bounds=c(0,100),
 plot_timecourse = function( D, sample_types, treatments, 
                                 concentrations, plot_raw=TRUE, 
                                 show_raw_vehicle=FALSE,
+                                combine_raw_plates=FALSE,
                                 ..., cex.xaxis=1, cex.yaxis=2, axis.font=2,
                                 summary_method="mean"){
     if( summary_method != "mean" & summary_method != "median"){
@@ -538,9 +562,15 @@ plot_timecourse = function( D, sample_types, treatments,
     ds_cur = D[ which(D$sample_type %in% sample_types &
                           D$treatment %in% treatments & 
                           D$concentration %in% concentrations),]
+    
     if(dim(ds_cur)[1]==0){
         stop(paste("No matches for this combination of sample_types,",
                    "treatments, and concentrations"))
+    }
+    if( plot_raw & !combine_raw_plates & length(unique(D$plate_id))>1 ){
+        stop(paste("if plot_raw is TRUE, you must restrict the dataset to a ",
+                   "single plate unless combine_raw_plates is passed with",
+                   "the value TRUE") )
     }
     if( plot_raw & show_raw_vehicle ){
         # identify vehicle rows for each combination of sample_type+treatment
@@ -552,6 +582,9 @@ plot_timecourse = function( D, sample_types, treatments,
             ds_cur = rbind(ds_cur, D[idx,] )   
         }
     }
+    ds_cur = ds_cur[ !is.na( ds_cur$concentration ) & 
+                         !is.na( ds_cur$treatment ) & 
+                         !is.na( ds_cur$sample_type),]
     
     hours = sort( unique( ds_cur$hours ) )
     unique_concs = sort( unique(ds_cur$concentration) )
@@ -574,16 +607,16 @@ plot_timecourse = function( D, sample_types, treatments,
     }
     
     # If plotting raw data, plot one curve for each plate.
-        Mstat = plyr::ddply( 
-            .data=ds_cur, 
-            .variables=c("sample_type", "hours", "concentration"), 
-            summarize, 
-            mu_raw = mean( value, na.rm=TRUE ),
-            med_raw = stats::median( value, na.rm=TRUE ), 
-            mu_norm = mean( value_normalized, na.rm=TRUE ),
-            med_norm = stats::median( value_normalized, na.rm=TRUE ), 
-            sample_type=unique( sample_type ) ,
-            concentration=unique( concentration )  )
+    Mstat = plyr::ddply( 
+        .data=ds_cur, 
+        .variables=c("sample_type", "hours", "concentration"), 
+        summarize, 
+        mu_raw = mean( value, na.rm=TRUE ),
+        med_raw = stats::median( value, na.rm=TRUE ), 
+        mu_norm = mean( value_normalized, na.rm=TRUE ),
+        med_norm = stats::median( value_normalized, na.rm=TRUE ), 
+        sample_type=unique( sample_type ) ,
+        concentration=unique( concentration )  )
     if( plot_raw ){
         if( summary_method=="mean"){
             values = Mstat$mu_raw
