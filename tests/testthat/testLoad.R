@@ -42,5 +42,12 @@ test_that("loading works", {
                   paste("if either concentrations_2 or treatments_2 is passed,",
                         "both parameters must be passed and must have the same",
                         "length"))
+    # Test that if we try to load a synergy dataset using 1 treatment, it warns
+    # in addition to throwing an error, so the user knows what the problem is
+    fn_data = system.file("extdata", "sample_data_synergy_platemap.xml", 
+                          package = pkg)
+    suppressWarnings( expect_error( 
+     read_platemap_from_Incucyte_XML(fn_data, max_treatments_per_well = 1 ), 
+     "incorrect number of subscripts on matrix") )
 } )
     
