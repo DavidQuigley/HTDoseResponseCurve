@@ -531,15 +531,12 @@ plot_values_by_plate = function( plate, hour=NA, color_bounds=c(0,100),
 #' @export
 plot_timecourse = function( D, sample_types, treatments, 
                                 concentrations, plot_raw=TRUE, 
-                                show_raw_vehicle=FALSE,
+                                show_vehicle=FALSE,
                                 combine_raw_plates=FALSE,
                                 ..., cex.xaxis=1, cex.yaxis=2, axis.font=2,
                                 summary_method="mean"){
     if( summary_method != "mean" & summary_method != "median"){
         stop("summary_method parameter must be either mean or median")
-    }
-    if( show_raw_vehicle & !plot_raw ){
-        stop("show_raw_vehicle==TRUE cannot be called without plot_raw==TRUE")   
     }
     for(i in 1:length(sample_types)){
         if( sum(D$sample_type==sample_types[i], na.rm=TRUE)==0 ){
@@ -572,7 +569,7 @@ plot_timecourse = function( D, sample_types, treatments,
                    "single plate unless combine_raw_plates is passed with",
                    "the value TRUE") )
     }
-    if( plot_raw & show_raw_vehicle ){
+    if( show_vehicle ){
         # identify vehicle rows for each combination of sample_type+treatment
         veh = unique(ds_cur[,c("negative_control", "sample_type", "plate_id")])
         for( i in 1:dim(veh)[2] ){
@@ -659,13 +656,12 @@ plot_timecourse = function( D, sample_types, treatments,
     }
     ylim = plot_parameters[["ylim"]]
     do.call( graphics::plot, plot_parameters )
-    graphics::axis(2, c(ylim[1], (ylim[2])/2, ylim[2]), las=1, 
+    graphics::axis(2, round( c(ylim[1], (ylim[2])/2, ylim[2]), 1), las=1, 
                    cex.axis=cex.yaxis,font= axis.font )
     graphics::axis(1, round(hours,1), las=2, cex.axis=cex.xaxis, font=axis.font )
     graphics::box()
     unique(Mstat)
 }
-
 
 
 #' Plot a dose response curve summary values across one or more time points
@@ -1179,4 +1175,230 @@ plot_additive_vs_synergy_effect = function( ds,
                       cex=plot_parameters[["cex"]] )
     axis(2, seq(from=0, to=1, by=.20), las=1)
     axis(1, at=1:(1+length(concs_for_DRC)), labels=c(0, concs_for_DRC), las=2 )
+}
+
+
+#' Create complete report for a single treatment
+#' 
+#' @param dataset dataset with columns matching the output of 
+#' \code{combine_data_and_maps}
+#' @param fit_summary output of a call to \code{fit_statistics}
+#' @param treatment_for_DRC the treatment to display
+#' @param sample_type sample types to show; if NA, show all in arbitrary order
+#' @param times_DRC time points at which to plot dose response curves (maximum
+#' of four, must be present in the dataset. If NA, no curves are plotted.
+#' @param ylim_raw lower and upper y-axis limit for raw DMSO curves
+#' @export 
+#' 
+plot_treatment_summary = function( dataset, fit_summary, 
+                                   treatment, sample_types=NA,
+                                   times_DRC=NA,
+                                   ylim_raw=NA ){
+    MAX_SF50 = 20e6
+    if( is.na(ylim_raw)[1] ){
+        ylim_raw = c(0, ceiling(max(dataset$value, na.rm=TRUE)) )
+    }
+    if( length(ylim_raw) != 2 ){
+        stop("ylim_raw must be a vector of length 2")   
+    }
+    if( is.na(sample_types[1]) ){
+        sample_types = sort( unique( dataset$sample_type) )
+    }
+    if( sum(fit_summary$treatment==treatment )==0 ){
+        stop(paste("treatment",treatment,"not in fit_summary"))        
+    }
+
+    for(i in 1:length(sample_types)){
+        if( sum(fit_summary$sample_type==sample_types[i])==0 ){
+            stop(paste("sample_type",sample_types[i],"not in fit_summary"))        
+        }
+    }
+    n_treat = is_dataset_valid(dataset, treatment=treatment, 
+                               sample_types=sample_types)
+    if( !is.na(times_DRC)){
+        if( length( times_DRC )>4 ){
+            stop("Can only highlight four times for DRC plot.")   
+        }
+        for(i in 1:length(times_DRC)){
+            if( sum(fit_summary$hour==times_DRC[i])==0 ){
+                stop(paste("time",times_DRC[i],"not in fit_summary"))        
+            }
+        }
+    }
+    vehicle = unique( dataset$negative_control[dataset$treatment==treatment ] )
+    if( sum(dataset$treatment==vehicle)==0){
+        stop( "dataset does not contain vehicle measurements" )
+    }
+    ds = dataset[dataset$sample_type %in% sample_types &
+                 dataset$treatment %in% c(treatment, vehicle),]
+    plates = sort(unique(ds$plate_id[ds$treatment==treatment]))
+    if( length(plates)>4 ){
+        warning("Cannot currently plot raw data for more than 4 plates")   
+    }
+    if( length(plates)==1 ){ n_blanks = 3 }
+    if( length(plates)==2 ){ n_blanks = 2 }
+    if( length(plates)==3 ){ n_blanks = 1 }
+    
+    # Axis should have all hours in the experiment
+    # individual plates may be missing timepoints, so need to re-calculate the
+    # hours used to plot values for each metric
+    AXIS_hours = sort(unique(round(ds$hours,1)))
+    if( is.na( times_DRC ) ){
+        layout(matrix( 1:8, byrow=TRUE, ncol=4, nrow=2 ))
+    }else{
+        layout(matrix( 1:12, byrow=TRUE, ncol=4, nrow=3 ))
+    }
+    par(mar=c(3,5,2,0))
+    for( i in 1:length(plates) ){
+        conc_this_plate = min(unique(ds$concentration[ds$plate_id==plates[i] & 
+                                                      ds$treatment==vehicle]))
+        samp_this_plate = sort(unique(ds$sample_type[ds$plate_id==plates[i] & 
+                                                      ds$treatment==vehicle]))
+        #ymax = ceiling( ds$value[ds$plate_id==plates[i] & ds$treatment==treatment )
+        tc=plot_timecourse(ds[ds$plate_id==plates[i],],
+                          sample_types = samp_this_plate ,
+                          treatments = vehicle,
+                          plot_raw = TRUE,
+                          show_vehicle = TRUE,
+                          concentrations = conc_this_plate,
+                          cex.yaxis = 1, 
+                          ylim=ylim_raw,
+                          main=paste("raw", vehicle, plates[i] ))
+        labels = unique(tc[,c("sample_type", "pch")])$sample_type
+        pches = unique(tc[,c("sample_type", "pch")])$pch
+        legend(0, ylim_raw[2], labels, cex=0.75, pch=pches, bty = "n")
+    }
+    
+    for(i in 1:n_blanks){
+        plot( -1000, -1000, axes=FALSE, xlab="", ylab="", xlim=c(0,1),
+              ylim=c(0, 1), main="")
+    }
+    
+    
+    ymax = 1.4
+    if( max(fit_summary$AUC[fit_summary$treatment==treatment], na.rm=TRUE)>1.5){ 
+        ymax = 2
+    }
+    plot( -1000, -1000, axes=FALSE, xlab="", ylab="AUC", 
+          xlim=c(0, max(AXIS_hours)), ylim=c(0, ymax), 
+          main=paste( "AUC", treatment) )
+    
+    graphics::axis(2, 0:ceiling(ymax), las=2, cex.axis=1, font=2 )
+    graphics::axis(1, AXIS_hours, las=2, cex.axis=1, font=2 )
+    for(i in 1:length(sample_types)){
+        idx = fit_summary$sample_type==sample_types[i] & 
+              fit_summary$treatment==treatment
+        vals = fit_summary$AUC[ idx ]
+        hours = round( fit_summary$hour[ idx ], 1)
+        points( hours, vals, col=INC_colors_DRC[i], pch=19 )
+    }
+    legend(0, ymax, sample_types, cex=0.75, pch=19, 
+           col=INC_colors_DRC[1:length(sample_types)], bty = "n")
+    box()
+
+    ymax = 1.4
+    MAX_EC50 = 20e6
+    
+    EC50 = fit_summary$coef_EC50
+    EC50[ is.infinite(EC50)] = NA
+    EC50[ EC50 > MAX_EC50 ] = MAX_EC50
+    ymax = ceiling( max( log10( EC50[fit_summary$treatment==treatment]), na.rm=TRUE) )
+    EC50 = log10(EC50)
+    plot( -1000, -1000, axes=FALSE, xlab="", ylab="log EC50", 
+          xlim=c(0, max(AXIS_hours)), ylim=c(0, ymax), 
+          main=paste( "EC50", treatment))
+    labels = c()
+    graphics::axis(2, las=2, cex.axis=1, font=2,
+                at = 0:ceiling(ymax),
+                labels=parse( text=paste("10^",0:ceiling(ymax),sep="")) )
+    graphics::axis(1, AXIS_hours, las=2, cex.axis=1, font=2 )
+    for(i in 1:length(sample_types)){
+        idx = fit_summary$sample_type==sample_types[i] & 
+              fit_summary$treatment==treatment
+        vals = EC50[ idx ]
+        hours = round( fit_summary$hour[ idx ], 1)
+        points( hours, vals, col=INC_colors_DRC[i], pch=19 )
+        if(length(!is.na(vals))>0){
+            points( round(hours,1), vals, col=INC_colors_DRC[i], pch=19 )
+        }
+    }
+    legend(0, ymax, sample_types, cex=0.75, pch=19, 
+           col=INC_colors_DRC[1:length(sample_types)], bty = "n")
+    box()
+    
+    ymax = 1.4
+    SF50 = fit_summary$SF50
+    SF50[ is.infinite(SF50)] = NA
+    SF50[ SF50 > MAX_SF50 ] = MAX_SF50
+    ymax = ceiling( max( log10( SF50[fit_summary$treatment==treatment]), na.rm=TRUE) )
+    if( is.na(ymax) | is.infinite(ymax) )
+        ymax=6
+    SF50 = log10(SF50)
+    plot( -1000, -1000, axes=FALSE, xlab="", ylab="log SF50", 
+          xlim=c(0, max(hours)), ylim=c(0, ymax), 
+          main=paste( "SF50", treatment))
+    graphics::axis(2, las=2, cex.axis=1, font=2,
+                   at = 0:ceiling(ymax),
+                   labels=parse( text=paste("10^",0:ceiling(ymax),sep="")) )
+    graphics::axis(1, AXIS_hours, las=2, cex.axis=1, font=2 )
+    for(i in 1:length(sample_types)){
+        idx = fit_summary$sample_type==sample_types[i] & 
+            fit_summary$treatment==treatment
+        vals = SF50[ idx ]
+        hours = round( fit_summary$hour[ idx ], 1)
+        points( hours, vals, col=INC_colors_DRC[i], pch=19 )
+        if( length(!is.na(vals))>0){
+            points( round(hours,1), vals, col=INC_colors_DRC[i], pch=19 )
+        }
+    }
+    legend(0, ymax, sample_types, cex=0.75, pch=19, 
+           col=INC_colors_DRC[1:length(sample_types)], bty = "n")
+    box()
+    
+    # All ANOVA p values will be same at a given {time point, treatment}
+    idx = fit_summary$sample_type==sample_types[1] & 
+          fit_summary$treatment==treatment
+    PVAL = -1 * log10( fit_summary$ANOVA_P_value[idx] )
+    PVAL[ is.infinite(PVAL)] = NA
+    vals = PVAL
+    ymax = ceiling( max(vals, na.rm=TRUE) )
+    hours = round( fit_summary$hour[ idx ], 1)
+    plot( hours,
+          vals,
+          axes = FALSE, xlab="", ylab="-log(P)", 
+          xlim = c( 0, max(AXIS_hours) ), ylim=c( 0, ymax ), 
+          main = paste( "ANOVA", treatment), pch=19 )
+    graphics::axis(2, las=2, cex.axis=1, font=2,
+                   at = 0:ceiling(ymax),
+                   labels=parse( text=paste("10^",0:ceiling(ymax),sep="")) )
+    graphics::axis(1, AXIS_hours, las=2, cex.axis=1, font=2 )
+    box()
+    
+    if( !is.na(times_DRC)){
+        for(h in 1:length(times_DRC)){
+            fit=fit_DRC( ds, 
+                     sample_types=sample_types,
+                     treatments = treatment, 
+                     hour=times_DRC[h], 
+                     fct=drc::LL.3() )
+            fpc=HT_fit_plot_colors( fit ) 
+            plot( fit, 
+              xlim=c(0, 1e6), ylim=c(0, 1.2),
+              lwd=3, 
+              main=paste(treatment, times_DRC[h], "hr"), 
+              ylab="surviving fraction", 
+              xlab="nM")
+            legend( 1, 0.35, 
+                legend = get.split.col(fpc$condition, "_|_", first = TRUE),
+                pch=19, col=fpc$col, bty="n", cex=0.75)
+            box()
+        }
+        if( length(times_DRC)<4 ){
+            for(i in 1 : (4-length(times_DRC)) ){
+                plot( -1000, -1000, axes=FALSE, xlab="", ylab="", xlim=c(0,1),
+                      ylim=c(0, 1), main="")
+            }
+        }
+    }
+    
 }
