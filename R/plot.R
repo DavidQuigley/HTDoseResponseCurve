@@ -273,8 +273,9 @@ plot.HT_fit = function( x, ..., bar_multiple=2,
         unfit = unique(Mstat[,c("conditions_to_fit", "concentration","value")])
         xlim_transformed=log10( plot_parameters[["xlim"]] )
         xlim_transformed[is.infinite(xlim_transformed)] = 0
-        plot( Mstat$concentration[Mstat$conditions_to_fit==conditions[1]], 
-              Mstat$value[Mstat$conditions_to_fit==conditions[1]],
+        plot( -1, -1, 
+        #plot( Mstat$concentration[Mstat$conditions_to_fit==conditions[1]], 
+        #      Mstat$value[Mstat$conditions_to_fit==conditions[1]],
               axes=FALSE, 
               xlim=xlim_transformed,
               ylim=plot_parameters[["ylim"]],
@@ -323,7 +324,7 @@ plot.HT_fit = function( x, ..., bar_multiple=2,
         
     }
         
-    Mstat$concentration[Mstat$concentration==0] = 1
+    #Mstat$concentration[Mstat$concentration==0] = 1
     
     graphics::points( Mstat$concentration, Mstat$value, pch = 19, 
             col=hsh_get( cond2color, as.character(Mstat$conditions_to_fit)), 
@@ -492,6 +493,10 @@ plot_values_by_plate = function( plate, hour=NA, color_bounds=c(0,100),
     graphics::box()
 }
 
+se = function(x){
+    stats::sd(x, na.rm=TRUE)/sqrt(sum(!is.na(x))) 
+}
+
 
 #' Plot an time course of the raw intensities 
 #' 
@@ -502,8 +507,10 @@ plot_values_by_plate = function( plate, hour=NA, color_bounds=c(0,100),
 #' @param concentrations which concentrations to draw
 #' @param plot_raw plot un-normalized raw values, defaults TRUE. If FALSE, 
 #' plots value_normalized.
-#' @param show_raw_vehicle If TRUE and plot_raw is TRUE, plot un-normalized 
+#' @param show_vehicle If TRUE and plot_raw is TRUE, plot un-normalized 
 #' raw vehicle values. Defaults to FALSE. 
+#' @param SEM_to_show If not zero, multiple of the SEM (standard error of 
+#' the mean) to show at each point. Defaults to 0.
 #' @param combine_raw_plates if TRUE, allow raw timecourse plots that include 
 #' more than one plate. Normally combining more than one plate in a raw 
 #' timecourse plot produces unexpected plot behavior because of plate-specific 
@@ -532,6 +539,7 @@ plot_values_by_plate = function( plate, hour=NA, color_bounds=c(0,100),
 plot_timecourse = function( D, sample_types, treatments, 
                                 concentrations, plot_raw=TRUE, 
                                 show_vehicle=FALSE,
+                                SEM_to_show = 0,
                                 combine_raw_plates=FALSE,
                                 ..., cex.xaxis=1, cex.yaxis=2, axis.font=2,
                                 summary_method="mean"){
@@ -614,6 +622,9 @@ plot_timecourse = function( D, sample_types, treatments,
         med_raw = stats::median( value, na.rm=TRUE ), 
         mu_norm = mean( value_normalized, na.rm=TRUE ),
         med_norm = stats::median( value_normalized, na.rm=TRUE ), 
+        sem_raw = sd(value, na.rm=TRUE)/sqrt(sum(!is.na(value))) ,
+        sem_norm= sd(value_normalized, na.rm=TRUE)/
+                        sqrt(sum(!is.na(value_normalized))) ,
         sample_type=unique( sample_type ) ,
         concentration=unique( concentration )  )
     if( plot_raw ){
@@ -621,13 +632,15 @@ plot_timecourse = function( D, sample_types, treatments,
             values = Mstat$mu_raw
         }else{
             values = Mstat$med_raw
-        }            
+        }
+        sems = Mstat$sem_raw
     }else{
         if( summary_method=="mean"){
             values = Mstat$mu_norm
         }else{
             values = Mstat$med_norm
         }
+        sems = Mstat$sem_norm
     }
     
     conc2color = hsh_from_vectors( as.character(unique_concs) , 
@@ -660,6 +673,17 @@ plot_timecourse = function( D, sample_types, treatments,
                    cex.axis=cex.yaxis,font= axis.font )
     graphics::axis(1, round(hours,1), las=2, cex.axis=cex.xaxis, font=axis.font )
     graphics::box()
+    if( SEM_to_show != 0 ){
+        for( i in 1:length( plot_parameters[["x"]]  )){
+            xx = plot_parameters[["x"]][i]
+            yy = plot_parameters[["y"]][i] 
+            lines( c(xx, xx), c( yy - (SEM_to_show*sems[i] ), 
+                                 yy + (SEM_to_show*sems[i]) ), 
+                   col=plot_parameters[["col"]][i] )
+        }
+    }
+        
+    
     unique(Mstat)
 }
 
@@ -1215,7 +1239,7 @@ plot_treatment_summary = function( dataset, fit_summary,
     }
     n_treat = is_dataset_valid(dataset, treatment=treatment, 
                                sample_types=sample_types)
-    if( !is.na(times_DRC)){
+    if( !is.na(times_DRC)[1]){
         if( length( times_DRC )>4 ){
             stop("Can only highlight four times for DRC plot.")   
         }
@@ -1242,7 +1266,7 @@ plot_treatment_summary = function( dataset, fit_summary,
     # Axis should have all hours in the experiment
     # individual plates may be missing timepoints, so need to re-calculate the
     # hours used to plot values for each metric
-    AXIS_hours = sort(unique(round(ds$hours,1)))
+    AXIS_hours = sort(unique(round(ds$hours[ds$treatment==treatment],1)))
     if( is.na( times_DRC ) ){
         layout(matrix( 1:8, byrow=TRUE, ncol=4, nrow=2 ))
     }else{
