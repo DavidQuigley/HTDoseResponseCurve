@@ -180,8 +180,15 @@ AUC.HT_fit = function(FIT, granularity=0.01, summary_method="mean"){
         }
     }else{
         max_concentration = max(FIT$input$concentration, na.rm=TRUE) 
-        conc_to_fit= seq(from=0, to=max_concentration, by=granularity )
-        
+        # extremely high conc, in excess of 20uM, will slow us to a crawl
+        # Use reduced granualarity of fit for highest values to compensate.
+        if( max_concentration>2e4 ){
+            conc_to_fit= seq(from=0, to=2e4, by=granularity )
+            conc_to_fit=c(conc_to_fit,seq(from=2e4, to=max_concentration, by=1))
+        }
+        else{
+            conc_to_fit= seq(from=0, to=max_concentration, by=granularity )
+        }    
         conc_test = rep(conc_to_fit, length(FIT$unique_conditions) )
         cond_test = c()
         for(i in 1:length(FIT$unique_conditions)){
@@ -1360,7 +1367,6 @@ fit_DRC = function(D, fct, sample_types=NA, treatments=NA, hour=NA,
     conditions_to_fit = model_input$conditions_to_fit
     if( length( unique( model_input$conditions_to_fit ) ) == 1 ){
         FIT$model = try( drc::drm( value~concentration, 
-#                                   conditions_to_fit,
                                    data=model_input, 
                                    fct = fct) )
     }
