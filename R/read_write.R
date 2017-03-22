@@ -349,20 +349,8 @@ read_plates_from_Incucyte_export = function( path_to_file, plate_id,
                                              number_of_wells, sheet_num=1, 
                                              plate_mask = NA){
     
-    xl = data.frame( readxl::read_excel(path_to_file, sheet=sheet_num) )
-    n_xl_rows = dim(xl)[1]
-    n_xl_cols = dim(xl)[2]
-    idx_plate_top = which( xl[,1] == "Time Stamp:" )
-    idx_last_data = max( which( !is.na( xl[,1] ) ) )
-    # blank first line
-    #n_plate_data_rows = idx_last_data - 
-    #    idx_plate_top[ length(idx_plate_top) ] - 1
-    n_plate_data_rows = idx_last_data-(idx_plate_top[length(idx_plate_top)]+2)
     expected_rows = plate_dimensions_from_wells(number_of_wells)$rows
     expected_cols = plate_dimensions_from_wells(number_of_wells)$cols
-    
-    # incucytye can't be trusted to write all rows or all columns
-    
     if( is.na(plate_mask) ){
         plate_mask = matrix(TRUE, nrow= expected_rows, ncol=expected_cols )
     }else{
@@ -372,14 +360,24 @@ read_plates_from_Incucyte_export = function( path_to_file, plate_id,
         }
     }
     
-    for(i in 1:length(idx_plate_top)){
-        hour = as.numeric( xl[idx_plate_top[i], 4] )
+    xl = data.frame( readxl::read_excel(path_to_file, sheet=sheet_num) )
+    n_xl_cols = dim(xl)[2]
+    # incucytye can't be trusted to write all rows or all columns
+    rows_timestamp = which( xl[,1] == "Time Stamp:" )
+    rows_a1 = which( xl[,1]=="A")
+    if( length(rows_timestamp)>1 ){
+        n_plate_data_rows = rows_timestamp[2]-rows_a1[1]-1
+    }else{
+        n_plate_data_rows = dim(xl)[1]-rows_a1[1]+1
+    }
+    highest_col_letter = xl[ rows_a1[1]:dim(xl)[1],1]
+    for(i in 1:length(rows_a1)){
+        hour = as.numeric( xl[rows_timestamp[i], 4] )
         plate = create_empty_plate( number_of_wells, hour, plate_id)
-        row_a1 = idx_plate_top[i]+2
         col_a1 = 2
-        row_last = row_a1 + n_plate_data_rows
+        row_last = rows_a1[i] + n_plate_data_rows
         col_last = n_xl_cols
-        plate_read = data.matrix(xl[row_a1 : row_last, col_a1 : col_last])
+        plate_read = data.matrix(xl[rows_a1[i] : row_last, col_a1 : col_last])
         plate[1:dim(plate_read)[1], 1:dim(plate_read)[2]] = plate_read
         vals = plate[1:expected_rows, 1:expected_cols]
         vals[!plate_mask]  = NA
@@ -393,6 +391,7 @@ read_plates_from_Incucyte_export = function( path_to_file, plate_id,
     }
     plates
 }
+
 
 #' Read a dataset from a text file
 #' 
