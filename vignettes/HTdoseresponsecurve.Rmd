@@ -59,19 +59,19 @@ labeled "DMSO".
 The following commands are explained in detail in the next section, "Loading 
 data without plate information".
 
-```{r echo=FALSE, warning=FALSE}
+```{r echo=FALSE, warning=FALSE, message=FALSE}
 library(knitr, quietly = TRUE)
 ```
 
 ```{r, fig.height=4, fig.width=4, message=FALSE}
 library(HTDoseResponseCurve)
 library(drc, quietly = TRUE)
+
+# 1) Load from file with columns sample_type, treatment, concentration, value
+# 2) Fit dose response curve, estimate upper/lower asymptote, IC50, and slope
+# 3) Plot dose response curve
+
 fn = system.file("extdata", "sample_data_1.txt", package="HTDoseResponseCurve")
-
-# Load from file with columns sample_type, treatment, concentration, value
-# fit dose response curve, estimate upper/lower asymptote, IC50, and slope
-# Plot dose response curve
-
 ds = read_dataset( fn, negative_control = "DMSO" )
 fit_1 = fit_DRC( ds, 
                  sample_types=c("line1", "line2"), 
@@ -128,15 +128,28 @@ with it; this value is conventionally called "hour" but could be days, minutes, 
 Specifying how to normalize data
 --------------------------------------------------------------------------------
 
-Data are first loaded and then optionally **normalized** against a negative control (also called a vehicle control). Many times it is desirable to reduce plate-specific or cell-line-specific effects by normalization of data against a control well that contains no perturbation other than the treatment vehicle. Normalization transforms each value into a percentage of the negative control. Normalized values can be greater than one. You can specify the negative control in four ways: 
+Data are first loaded and then optionally **normalized** against a negative control (also called a *vehicle* control, named after the *vehicle* substance in which a drug is dissolved to put it into solution). Many times it is desirable to reduce plate-specific or cell-line-specific effects by normalization of data against a control well that contains no perturbation other than the treatment vehicle. Normalization transforms each value into a percentage of the negative control. Normalized values can be greater than one. You can specify the negative control in four ways: 
 
-1. No negative control wells exist. *Use case example*: data are already normalized.
-2. One or more wells are the shared negative control for all other treatments with that sample type on the plate. *Use case example*: All drugs on the plate were dissolved in DMSO, and DMSO-alone wells 
-were run on the plate as a control.
-3. For each treatment, there is one or more well with a (presumably zero) concentration of that treatment that should be considered a negative control. This case is appropriate if each treatment has its own no treatment wells, labeled with the name of that treatment. *Use case example*: The plate carries Olaparib and Rucaparib treatments, and each has a DMSO control, labeled as "Olaparib" and "Rucaparib" respectively, with drug concentration labeled as 0 for control wells.
-4. There are two or more *distinct* sets of shared negative control wells, with some treatments mapped to each. *Use case example*: the plate carries three drugs with a shared DMSO control, and one with an ethanol control.
+1. No negative control wells exist.  
+*Use case example*: data are already normalized.
+2. One or more wells are the shared negative control for all other treatments 
+with that sample type on the plate.  
+*Use case example*: All drugs on the plate were dissolved in DMSO, and 
+DMSO-alone wells were run on the plate as a control.
+3. For each treatment, there is one or more well with a (presumably zero) 
+concentration of that treatment that should be considered a negative control. 
+This case is appropriate if each treatment has its own no treatment wells, 
+labeled with the name of that treatment.  
+*Use case example*: The plate carries Olaparib and Rucaparib treatments, and 
+each has a DMSO control, labeled as "Olaparib" and "Rucaparib" respectively, 
+with drug concentration labeled as 0 for control wells.
+4. There are two or more *distinct* sets of shared negative control wells, with 
+some treatments mapped to each.  
+*Use case example*: the plate carries three drugs with a shared DMSO control, 
+and one with an ethanol control.
 
-If you specify the existence of negative controls, *HTDoseResponseCurve* will expect to find them for all of the sample types and treatments on the plate.
+If you specify the existence of negative controls, *HTDoseResponseCurve* will 
+expect to find them for all of the sample types and treatments on the plate.
 
 Loading Data directly from R
 ---------------------------------------
@@ -153,10 +166,10 @@ concentrations = c( rep(0,6),rep(200,6), rep(500,6),rep(1000,6),rep(5000,6))
 values=c(100,99,100,90,91,92,99,97,99,89,87,88,
          86,89,88,56,59,58,66,65,67,25,23,24,42,43,46,4,5,9)
 
-ds = create_dataset( sample_types, 
-                     treatments, 
-                     concentrations, 
-                     values,
+ds = create_dataset( sample_types = sample_types, 
+                     treatments = treatments, 
+                     concentrations = concentrations, 
+                     values = values,
                      negative_control = "DMSO")
 ```
 
@@ -172,7 +185,7 @@ text file must have the following column headers in the first row:
 **concentration**  
 **value**  
 
-Note the underscore in **sample_type**. These headers may be in any order, and additional columns may be present. If your text file has the optional column **hour**, data from this column will be loaded into the dataset.
+These headers may be in any order, and additional columns may be present. If your text file has the optional column **hour**, data from this column will be loaded into the dataset.
 
 The following example experiment tested the effect of four concentrations of a 
 drug (200, 500, 1000, and 2000 nM) on the viabilitity of two cell lines, 
@@ -386,9 +399,9 @@ plot_values_by_plate(plate_1)
 Combine the plate map and the raw data
 -----------------------------------------
 
-So far we have separately specified measurement values (in the *plate* variable) and meta-data values (in the *plate_map* variable). It is common to re-use the same plate map information for data from many timepoints. To analyze the data we will combine the measurements and metadata into a single dataset. 
+It is common to re-use the same plate map information for data from many timepoints. To analyze the data we will combine the measurements (in the *plate* variable) and metadata (in the *plate_map* variable) into a single dataset. 
 
-When combining the plate map and raw data, you must specify **which wells (if any) correspond to negative controls**, also known as vehicle-treated wells. Negative controls are described above in the section **Specifying how to normalize data**; please review that section if you skipped it.
+When combining the measurements and metadata, you must specify **which wells (if any) correspond to negative controls**, also known as vehicle-treated wells. Negative controls are described above in the section **Specifying how to normalize data**; please review that section if you skipped it.
 
 In this example, there are `r sum(plate_map$treatment=="DMSO")` negative control wells with the treatment label "DMSO".
 
@@ -443,7 +456,7 @@ ds = combine_data_and_map( raw_plate = plate_data,
 
 This experiment tested the effect of `r length(get_treatments(ds[!ds$is_negative_control,]))` different drugs on two cell lines, imaged every 12 hours over five days.
 
-In this example, there are `r sum(plate_map$treatment=="DMSO")` negative control (vehicle) wells on each plate with the treatment label "DMSO".
+In this example, there are `r sum(!is.na(plate_map$treatment) & plate_map$treatment=="DMSO")` negative control (vehicle) wells on each plate with the treatment label "DMSO".
 
 The expected concentration unit for these plots will be nanomoles of drug; since the experimental data for this example were recorded in micromoles, we will multiply the concentration by 1000 to get nanomoles.
 
@@ -606,23 +619,29 @@ kable(
 
 We can summarize these results for a single treatment (drug 13) across all time points at once using the *plot_treatment_summary()* function. This function will plot dose response curves from up to four time points.
 
-```{r plot_ts, fig.height=8, fig.width=8}
+```{r plot_ts, fig.height=8, fig.width=8, warning=FALSE}
+#pdf("/notebook/HTDoseResponseCurve_paper/reproduce/treatment_summary.pdf",
+#    height=8, width=8)
 plot_treatment_summary(ds_test, 
                        fits,
                        treatment = "drug13", 
                        times_DRC = c(48, 96, 120, 168))
+#dev.off()
 ```
 
 If we want a more detailed plot for AUC across all time points, we can use the function *plot_fit_statistic()*. Observations where the *ANOVA_P_value* exceeds an alpha-level cut-off set by the user are drawn as open circles and not connected by lines. Here the alpha-level cut-off is 0.0025, chosen to correct an alpha = 0.05 for 20 tests by simple Bonferroni adjustment. The choice of whether to set a *P* value threshold, and how that value might be selected, is entirely up to you.
 
-```{r plot_fit_statistic_AUC, fig.height=5, fig.width=8, warning=FALSE}
+```{r plot_fit_statistic_AUC, fig.height=5, fig.width=9, warning=FALSE}
 ps = plot_fit_statistic( fits[fits$treatment=="drug13",], 
                     statistic = "AUC", 
                     alpha = 0.0025,
                     ylim=c(0, 1.5),
                     main="Area Under the Dose Response Curve, drug 13")
-legend(0, 0.3, unique(ps$sample_type), col=unique(ps$color), pch=19, bty="n" )
-legend(36, 0.3, c("P>alpha", "P<=alpha"), 
+legend(x=0, y=0.3, 
+       legend=unique(ps$sample_type), 
+       col=unique(ps$color), pch=19, bty="n" )
+legend(x=36, y=0.3, 
+       legend=c("P>alpha", "P<=alpha"), 
        pch=c(13,19),  bty="n", col="darkgrey" )
 ```
 
@@ -641,7 +660,9 @@ plot( fit_DRC( ds,
      ylab="surviving fraction", 
      xlab="nM",
      ylim=c(0, 1.5))
-legend(2, 0.4, c("line 1", "line 2"), fill=c("black", "red"), bty="n" )
+legend(x=2, y=0.4, 
+       legend=c("line 1", "line 2"), 
+       fill=c("black", "red"), bty="n" )
 ```
 
 The fit converged here, and the values were significantly different from each other in the ANOVA test, but it's clear that there is not a sensible dose response effect and neither drug acheived a $SF_{50}$. We can screen out these values by passing the *obs_min* parameter value:
@@ -655,8 +676,10 @@ ps = plot_fit_statistic(
             ylim=c(0,1.5),
             main="Area Under the Dose Response Curve, drug 13",
             sub="Requiring SF50 for at least one sample type")
-legend(0, 0.3, unique(ps$sample_type), fill=unique(ps$color), bty="n" )
-legend(36, 0.3, c("P>alpha", "P<=alpha, min>obs_min", "P<=alpha, min<=min_obs"), 
+legend(x=0, y=0.3, 
+       legend=unique(ps$sample_type), fill=unique(ps$color), bty="n" )
+legend(x=36, y=0.3, 
+       legend=c("P>alpha", "P<=alpha, min>obs_min", "P<=alpha, min<=min_obs"), 
        pch=c(13,18,19),  bty="n", col="darkgrey" )
 ```
 
@@ -684,7 +707,7 @@ rel_AUC[ invalid_alpha  ] = NA
 M=plot_color_grid( rel_AUC, color_bounds = c(-3,3) )
 ```
 
-We can easily change the properties of the plot using parameters of *plot_color_grid()*:
+We customize the plot using parameters of *plot_color_grid()*:
 
 ```{r plot_color_grid, fig.height=5, fig.width=6}
 M=plot_color_grid( rel_AUC, 
@@ -850,11 +873,10 @@ Biopharmaceutical Research 2012](http://www.tandfonline.com/doi/abs/10.1198/sbr.
 Controversies in synergy
 ------------------------------
 
-The best approach to assessing drug synergy is not clear. The Combination Index 
-method is frequently used. However, the combination index has been subject to 
-criticism from statisticians who advocate non-linear model fitting as 
-superior to the CI method. For an introduction to the terminology and problems, 
-the following references may be helpful:
+The best approach to assessing drug synergy is not clear. The combination index 
+has been subject to criticism from statisticians who advocate non-linear model 
+fitting as superior to the CI method. For an introduction to the terminology 
+and issues, the following references may be helpful:
 
 Articles explaining CI methods and advocating their use:
 
@@ -862,13 +884,13 @@ Articles explaining CI methods and advocating their use:
 Pharmacological Sciences*
 1983](http://www.sciencedirect.com/science/article/pii/016561478390490X)
 
-* [Chou Cancer Research 2010](http://cancerres.aacrjournals.org/content/70/2/440.long)
+* [Chou *Cancer Research* 2010](http://cancerres.aacrjournals.org/content/70/2/440.long)
 
 Articles critical of CI methods
 
 * [Greco, Bravo, Parsons *Pharmacological Reviews* 1995](http://pharmrev.aspetjournals.org/content/47/2/331.long)
-* [Ashton Cancer Research 2015](http://cancerres.aacrjournals.org/content/75/11/2400.long)
-* [Foucquier & Guedj, Pharmacological Research Perspectives 2015](http://onlinelibrary.wiley.com/doi/10.1002/prp2.149/abstract)
+* [Ashton *Cancer Research* 2015](http://cancerres.aacrjournals.org/content/75/11/2400.long)
+* [Foucquier & Guedj, *Pharmacological Research Perspectives* 2015](http://onlinelibrary.wiley.com/doi/10.1002/prp2.149/abstract)
 
 
 Calculating the Combination Index
@@ -985,10 +1007,11 @@ ${Effect}_{null} = {Effect}_A + {Effect}_B - ({Effect}_A \times {Effect}_B)$
 This result is sometimes called the "excess over Bliss independence".
 
 In this example, two drugs are tested at four concentrations (including 0 nM, 
-the vehicle condition). In one reality the dataset (DS_add), they have merely 
-additive effects when combined. In an alternate reality (DS_syn), they have 
-evidence for synergistic interactions when combined. The Excess over Bliss 
-score is plotted as a heat map using the *plot_color_grid()* function.
+the vehicle condition). In one scenario, the dataset (DS_add), they have merely 
+additive effects when combined. In an alternate scenario, using with different 
+measured values (DS_syn), there is evidence for synergistic interactions when 
+combined. The Excess over Bliss score is plotted as a heat map using the
+*plot_color_grid()* function.
 
 ```{r fig.height=5, fig.width=9}
 
@@ -1009,8 +1032,8 @@ DS_syn=create_synergy_dataset( sample_types=samples, treatments_1=t1,
                          concentrations_2=c2, values=value_syn, 
                          negative_control="DMSO")
 
-b_add = synergy_bliss(DS_add, "drug1", "drug2")
-b_syn = synergy_bliss(DS_syn, "drug1", "drug2")
+b_add = synergy_bliss(DS_add, "drug1", "drug2", sample_type="cell_line_1")
+b_syn = synergy_bliss(DS_syn, "drug1", "drug2", sample_type="cell_line_1")
 layout(matrix(1:2,1,2))
 par(mar=c(4,4,3,1))
 gi = plot_color_grid(b_add$excess*100, color_bounds = c(-100,100), 
